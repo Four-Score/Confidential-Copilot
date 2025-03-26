@@ -2,14 +2,25 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-For development ensure you have the following node and npm versions by running the following commands
+For development:
+Clone the repo and navigate to the project folder
 
-node -v
-# v22.14.0
-npm -v
-# v10.9.2
+Ensure you have the following node and npm versions by running the following commands
 
-First, run the development server:
+`node -v`
+
+output: v22.14.0
+
+`npm -v`
+
+
+output: v10.9.2
+
+If not then:
+
+`npm install`
+
+And finally, run the development server:
 
 ```bash
 npm run dev
