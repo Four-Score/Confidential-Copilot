@@ -2,6 +2,13 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+For development ensure you have the following node and npm versions by running the following commands
+
+node -v
+# v22.14.0
+npm -v
+# v10.9.2
+
 First, run the development server:
 
 ```bash
