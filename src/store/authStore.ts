@@ -12,16 +12,43 @@ import {
     generateRandomSymmetricKey,
     generateRecoveryKeyString,
     encryptKey
-} from '@/lib/crypto'; 
+} from '@/lib/crypto';
+import { KeyMaterial,
+        EncryptedKeyData,
+        RecoveryKeyData
+} from '@/types/auth';
+
+// Helper function to validate email format
+const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+};
+
+// Helper function to validate minimum password length and complexity
+const isValidPassword = (password: string): boolean => {
+    const minLength = 8;
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+    return (
+        password.length >= minLength &&
+        hasUpperCase &&
+        hasLowerCase &&
+        hasNumber &&
+        hasSpecialChar
+    );
+};
 
 // Define the state structure
 interface AuthState {
-    user: User | null;
-    session: Session | null;
-    decryptedSymmetricKey: CryptoKey | null; // Store the actual CryptoKey object
-    isLoading: boolean;
-    error: string | null;
-    isAuthenticated: () => boolean; // Derived state helper
+    user: User | null; // Current Supabase user
+    session: Session | null; // Current Supabase session
+    decryptedSymmetricKey: CryptoKey | null; // Store the actual CryptoKey object - only kept in memory
+    isLoading: boolean; // Indicates if an async operation is in progress
+    error: string | null; // Stores any error message
+    isAuthenticated: () => boolean; // Derived state helper - checks if user and session exist
 
     // --- Core Actions ---
     // (Implementation details will be added later for complex ones)
@@ -42,7 +69,7 @@ interface AuthState {
     }>;
     storeGeneratedKeys: (keyMaterial: NonNullable<AuthState['signup']['prototype']['keyMaterial']>) => Promise<{ success: boolean; error?: string }>;
     logout: () => Promise<void>;
-    recoverWithKey: (recoveryKeyString: string, saltB64: string, encKeyRecoveryB64: string, ivRecoveryB64: string) => Promise<{ success: boolean; error?: string }>; // For use after recovery
+    recoverWithKey: (recoveryKeyData: RecoveryKeyData) => Promise<{ success: boolean; error?: string }>; // For use after recovery
     resetPasswordAndUpdateKeys: (newPassword: string) => Promise<{ success: boolean; error?: string }>; // For use after recovery or password change
 
     // --- Internal Actions / State Setters ---
@@ -54,9 +81,37 @@ interface AuthState {
     initializeAuth: () => Promise<void>; // Check initial auth state
 }
 
+
+//  Centralized error handling function to reduce repetitive error handling logic.
+//  @param set - Zustand's set function to update the store.
+//  @param supabase - The Supabase client.
+//  @param error - The error object.
+//  @param customMessage - Optional custom error message.
+//  @param signOut - Whether to sign out the user after the error.
+//  @returns An object with success: false and the error message.
+
+const handleAuthError = async (
+    set: any,
+    supabase: any,
+    error: any,
+    customMessage?: string,
+    signOut: boolean = false
+) => {
+    console.error("Authentication error:", error);
+    const errorMessage = customMessage || error.message || "An unknown error occurred.";
+    set({ isLoading: false, error: errorMessage });
+
+    if (signOut && supabase) {
+        await supabase.auth.signOut().catch((err: any) => console.error("Error signing out after error:", err));
+        set({ decryptedSymmetricKey: null }); // Clear the decrypted key from memory
+    }
+
+    return { success: false, error: errorMessage };
+};
+
 // Create the Zustand store
 export const useAuthStore = create<AuthState>((set, get) => ({
-    // Initial State 
+    // Initial State
     user: null,
     session: null,
     decryptedSymmetricKey: null,
@@ -66,17 +121,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     // Actions Implementation
 
+    
+    //  Sets the user and session state.
+    //  @param user - The Supabase user object.
+    //  @param session - The Supabase session object.
+     
     setAuthState: (user, session) => {
         if (!user || !session) {
             console.error("Invalid user or session provided to setAuthState.");
             set({ user: null, session: null, isLoading: false, error: "Invalid user or session." });
             return;
         }
-    
+
         set({ user, session, isLoading: false });
         console.log("Auth state updated:", { user, session });
     },
 
+    
+    //  Sets the decrypted symmetric key in the store.
+    //  @param key - The decrypted symmetric key (CryptoKey object).
+    
     setDecryptedKey: (key) => {
         if (key) {
             console.log("Decrypted symmetric key set in memory.");
@@ -86,11 +150,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ decryptedSymmetricKey: key });
     },
 
+    
+    //  Sets the loading state.
+    //  @param loading - A boolean indicating whether to show the loading state.
+    
     setLoading: (loading) => set({ isLoading: loading }),
-    setError: (error) => set({ error, isLoading: false }), // Stop loading on error
+
+    
+    //  Sets the error state.
+    //  @param error - The error message.
+    
+    setError: (error: string | null) => set({ error, isLoading: false }), // Stop loading on error
+
+    /**
+     * Clears the error state.
+     */
     clearError: () => set({ error: null }),
 
-    // Initialize Auth State (Call this once when the app loads)
+    /**
+     * Initializes the authentication state by checking for an existing session.
+     * This function is called once when the app loads.
+     */
     initializeAuth: async () => {
         set({ isLoading: true });
         const supabase = createClient(); // Browser client
@@ -112,7 +192,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             set({ user: null, session: null, isLoading: false });
         }
 
-        // Listen for auth changes (login, logout, token refresh)
+        /**
+         * Listens for authentication state changes (login, logout, token refresh).
+         * Updates the store's state accordingly.
+         */
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             (_event, session) => {
                 console.log("Auth state changed:", _event, session);
@@ -138,9 +221,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // };
     },
 
-    login: async (email, password) => {
+   
+    //  Logs in an existing user.
+    //  @param email - The user's email address.
+    //  @param password - The user's password.
+    //  @returns An object with success: true if login is successful, or success: false and an error message otherwise.
+    
+    login: async (email: string, password: string): Promise<{
+        success: boolean;
+        error?: string;
+        recoveryKeyNeeded?: boolean;
+    }> => {
         set({ isLoading: true, error: null, decryptedSymmetricKey: null }); // Clear previous key on new login attempt
         const supabase = createClient();
+
+        // Validate inputs
+        if (!email || !isValidEmail(email)) {
+            return handleAuthError(set, supabase, new Error("Invalid email address."), "Invalid email address.");
+        }
+        if (!password || !isValidPassword(password)) {
+            return handleAuthError(set, supabase, new Error("Invalid password. Must be at least 8 characters."), "Invalid password. Must be at least 8 characters.");
+        }
 
         try {
             // 1. Sign in with Supabase
@@ -161,42 +262,46 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             console.log("Fetching user keys...");
             const { data: keyData, error: keyFetchError } = await supabase
                 .from('user_keys')
-                .select('salt, enc_key_pw, iv_pw') // Select only needed fields for password login
+                .select('salt, enc_key_pw, iv_pw, enc_key_recovery, iv_recovery')
                 .eq('user_id', user.id)
                 .single(); // Expect exactly one row
 
-            if (keyFetchError) {
-                // Distinguish between "not found" and other errors
-                if (keyFetchError.code === 'PGRST116') { // PostgREST code for "Resource Not Found"
-                     console.warn("User keys not found. Signup might be incomplete.");
-                     set({ isLoading: false, error: "Encryption keys not found. Please complete signup or contact support." });
-                     // Optionally return a specific flag if needed by UI
-                     return { success: false, error: "Encryption keys not found.", recoveryKeyNeeded: true }; // Indicate potential signup issue
+                if (keyFetchError) {
+                    // Distinguish between "not found" and other errors
+                    if (keyFetchError.code === 'PGRST116') { // PostgREST code for "Resource Not Found"
+                         console.warn("User keys not found. Signup might be incomplete.");
+                         set({ isLoading: false, error: "Encryption keys not found. Please complete signup or contact support." });
+                         // Optionally return a specific flag if needed by UI
+                         return { success: false, error: "Encryption keys not found.", recoveryKeyNeeded: true }; // Indicate potential signup issue
+                    }
+                     return handleAuthError(set, supabase, keyFetchError, `Failed to fetch keys: ${keyFetchError.message}`);
                 }
-                 throw new Error(`Failed to fetch keys: ${keyFetchError.message}`);
-            }
-            if (!keyData || !keyData.salt || !keyData.enc_key_pw || !keyData.iv_pw) {
-                throw new Error("Incomplete key data fetched from database.");
-            }
-            console.log("User keys fetched successfully.");
+
+                // Type assert keyData as EncryptedKeyData
+                const encryptedKeyData: EncryptedKeyData = keyData as EncryptedKeyData;
+
+                if (!encryptedKeyData || !encryptedKeyData.salt || !encryptedKeyData.enc_key_pw || !encryptedKeyData.iv_pw) {
+                    return handleAuthError(set, supabase, new Error("Incomplete key data fetched from database."), "Incomplete key data fetched from database.");
+                }
+                console.log("User keys fetched successfully.");
 
             // 3. Decode data
-            const salt = base64ToArrayBuffer(keyData.salt);
-            const encryptedKeyData = base64ToArrayBuffer(keyData.enc_key_pw);
-            const iv = base64ToArrayBuffer(keyData.iv_pw);
+            const salt: ArrayBuffer = base64ToArrayBuffer(encryptedKeyData.salt);
+            const encryptedKeyDataPw: ArrayBuffer = base64ToArrayBuffer(encryptedKeyData.enc_key_pw);
+            const iv: Uint8Array = new Uint8Array(base64ToArrayBuffer(encryptedKeyData.iv_pw));
 
             // 4. Derive wrapping key from password
             console.log("Deriving key from password...");
-            const wrappingKey = await deriveKeyFromPassword(password, new Uint8Array(salt));
+            const wrappingKey: CryptoKey = await deriveKeyFromPassword(password, new Uint8Array(salt));
             console.log("Password key derived.");
 
             // 5. Decrypt the symmetric key
             console.log("Decrypting symmetric key...");
-            const decryptedRawKey = await decryptKey(encryptedKeyData, new Uint8Array(iv), wrappingKey);
+            const decryptedRawKey: ArrayBuffer = await decryptKey(encryptedKeyDataPw, new Uint8Array(iv), wrappingKey);
             console.log("Symmetric key decrypted.");
 
             // 6. Import the raw key into a CryptoKey object
-            const symmetricKey = await importSymmetricKey(decryptedRawKey);
+            const symmetricKey: CryptoKey = await importSymmetricKey(decryptedRawKey);
             console.log("Symmetric key imported.");
 
             // 7. Store the decrypted key in state
@@ -206,18 +311,32 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             return { success: true };
 
         } catch (error: any) {
-            console.error("Login process error:", error);
-            // Clear potentially partially set state on failure
-            set({ isLoading: false, error: error.message || "An unknown login error occurred.", decryptedSymmetricKey: null, user: null, session: null });
-             // Sign out if login failed after Supabase sign-in but before key decryption
-            await supabase.auth.signOut().catch(err => console.error("Error signing out after failed login:", err));
-            return { success: false, error: error.message };
+            return handleAuthError(set, supabase, error, undefined, true);
         }
     },
 
-    signup: async (email, password) => {
+    
+    //  Signs up a new user.
+    //  @param email - The user's email address.
+    //  @param password - The user's password.
+    //  @returns An object with success: true if signup is successful, or success: false and an error message otherwise.
+    //  If signup is successful, it also returns the key material needed to store the encryption keys.
+    
+    signup: async (email: string, password: string): Promise<{
+        success: boolean;
+        error?: string;
+        keyMaterial?: KeyMaterial | null;
+        }> => {
         set({ isLoading: true, error: null });
         const supabase = createClient();
+
+        // Validate inputs
+        if (!email || !isValidEmail(email)) {
+            return handleAuthError(set, supabase, new Error("Invalid email address."), "Invalid email address.");
+        }
+        if (!password || !isValidPassword(password)) {
+            return handleAuthError(set, supabase, new Error("Invalid password. Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character."), "Invalid password. Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character.");
+        }
 
         try {
             // 1. Sign up with Supabase Auth
@@ -230,9 +349,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             if (signUpError) {
                 // Check for specific error cases before throwing general error
                 if (signUpError.message.includes("User already registered")) {
-                    throw new Error("User already exists. Please log in or confirm your email.");
+                    return handleAuthError(set, supabase, new Error("User already exists. Please log in or confirm your email."), "User already exists. Please log in or confirm your email.");
                 }
-                throw new Error(`Sign up failed: ${signUpError.message}`);
+                return handleAuthError(set, supabase, signUpError, `Sign up failed: ${signUpError.message}`);
             }
             // Handle cases where user exists but isn't confirmed, or general lack of user data
             if (!signUpData.user) {
@@ -245,10 +364,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 
                 // Use the data from the API response instead of signUpError
                 if (data?.userExists) {
-                    throw new Error("User already exists. Please log in or confirm your email.");
+                    return handleAuthError(set, supabase, new Error("User already exists. Please log in or confirm your email."), "User already exists. Please log in or confirm your email.");
                 }
                 
-                throw new Error("Sign up failed: No user data returned.");
+                return handleAuthError(set, supabase, new Error("No user data returned."), "Sign up failed: No user data returned.");
             }
             if (signUpData.user.identities?.length === 0) {
                 // This can happen if email confirmation is required but the user already exists unconfirmed.
@@ -256,7 +375,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                  console.warn("User may already exist and require confirmation.");
                  // Depending on your flow, you might want to prompt the user to check their email again.
                  // For this flow, we'll treat it as a potential issue needing confirmation.
-                 throw new Error("Sign up requires email confirmation. Please check your inbox (and spam folder).");
+                 return handleAuthError(set, supabase, new Error("Sign up requires email confirmation. Please check your inbox (and spam folder)."), "Sign up requires email confirmation. Please check your inbox (and spam folder).");
             }
 
             const user = signUpData.user;
@@ -267,22 +386,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
             // 2. Generate all cryptographic keys and material CLIENT-SIDE
             console.log("Generating cryptographic keys...");
-            const salt = generateSalt();
-            const passwordDerivedKey = await deriveKeyFromPassword(password, salt);
-            const symmetricKey = await generateRandomSymmetricKey();
-            const recoveryKeyString = generateRecoveryKeyString(); // Generate the string for the user
-            const recoveryDerivedKey = await deriveKeyFromRecoveryString(recoveryKeyString, salt); // Use same salt
+            const salt: Uint8Array = generateSalt();
+            const passwordDerivedKey: CryptoKey = await deriveKeyFromPassword(password, salt);
+            const symmetricKey: CryptoKey = await generateRandomSymmetricKey();
+            const recoveryKeyString: string = generateRecoveryKeyString(); // Generate the string for the user
+            const recoveryDerivedKey: CryptoKey = await deriveKeyFromRecoveryString(recoveryKeyString, salt); // Use same salt
 
             // 3. Encrypt the symmetric key twice
             const { ciphertext: ctPw, iv: ivPw } = await encryptKey(symmetricKey, passwordDerivedKey);
             const { ciphertext: ctRec, iv: ivRec } = await encryptKey(symmetricKey, recoveryDerivedKey);
 
             // 4. Encode everything to Base64 for storage/transfer
-            const saltB64 = arrayBufferToBase64(salt.buffer as ArrayBuffer);
-            const encKeyPwB64 = arrayBufferToBase64(ctPw);
-            const ivPwB64 = arrayBufferToBase64(ivPw.buffer as ArrayBuffer);
-            const encKeyRecoveryB64 = arrayBufferToBase64(ctRec as ArrayBuffer);
-            const ivRecoveryB64 = arrayBufferToBase64(ivRec.buffer as ArrayBuffer);
+            const saltB64: string = arrayBufferToBase64(salt.buffer as ArrayBuffer);
+            const encKeyPwB64: string = arrayBufferToBase64(ctPw);
+            const ivPwB64: string = arrayBufferToBase64(ivPw.buffer as ArrayBuffer);
+            const encKeyRecoveryB64: string = arrayBufferToBase64(ctRec as ArrayBuffer);
+            const ivRecoveryB64: string = arrayBufferToBase64(ivRec.buffer as ArrayBuffer);
 
             console.log("Keys generated and encrypted.");
 
@@ -303,41 +422,37 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             };
 
         } catch (error: any) {
-            console.error("Signup process error:", error);
-            set({ isLoading: false, error: error.message || "An unknown signup error occurred.", user: null, session: null });
-            // Attempt to sign out if Supabase signup succeeded but key gen failed
-            if (get().user) {
-                await supabase.auth.signOut().catch(err => console.error("Error signing out after failed signup keygen:", err));
-            }
-            return { success: false, error: error.message };
+            return handleAuthError(set, supabase, error, undefined, true);
         }
     },
 
-    storeGeneratedKeys: async (keyMaterial) => {
+    /**
+     * Stores the generated encryption keys in the database.
+     * @param keyMaterial - The key material generated during signup.
+     * @returns An object with success: true if the keys are stored successfully, or success: false and an error message otherwise.
+     */
+    storeGeneratedKeys: async (keyMaterial: KeyMaterial): Promise<{ success: boolean; error?: string }> => {
         set({ isLoading: true, error: null });
         const supabase = createClient();
         const currentUser = get().user;
-    
+
         // Ensure the user performing this action matches the userId in keyMaterial
         if (!currentUser || currentUser.id !== keyMaterial.userId) {
-            const errorMsg = "Authentication mismatch: Cannot store keys for a different user.";
-            console.error(errorMsg);
-            set({ isLoading: false, error: errorMsg });
-            return { success: false, error: errorMsg };
+            return handleAuthError(set, supabase, new Error("Authentication mismatch: Cannot store keys for a different user."), "Authentication mismatch: Cannot store keys for a different user.");
         }
-    
+
         console.log("Storing generated keys for user:", keyMaterial.userId);
-    
+
         const maxRetries = 3;
         let attempt = 0;
-    
+
         while (attempt < maxRetries) {
             try {
                 // Validate schema compatibility (e.g., check required fields)
                 if (!keyMaterial.saltB64 || !keyMaterial.encKeyPwB64 || !keyMaterial.ivPwB64) {
                     throw new Error("Invalid key material: Missing required fields.");
                 }
-    
+
                 const { error: insertError } = await supabase
                     .from('user_keys')
                     .insert({
@@ -348,37 +463,38 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                         enc_key_recovery: keyMaterial.encKeyRecoveryB64,
                         iv_recovery: keyMaterial.ivRecoveryB64,
                     });
-    
-                if (insertError) {
-                    // Handle potential unique constraint violation if keys already exist
-                    if (insertError.code === '23505') { // PostgreSQL unique violation code
-                        console.warn(`Keys already exist for user ${keyMaterial.userId}.`);
-                        throw new Error("Failed to store keys: Keys already exist for this user.");
+
+                    if (insertError) {
+                        // Handle potential unique constraint violation if keys already exist
+                        if (insertError.code === '23505') { // PostgreSQL unique violation code
+                            console.warn(`Keys already exist for user ${keyMaterial.userId}.`);
+                            return handleAuthError(set, supabase, new Error("Failed to store keys: Keys already exist for this user."), "Failed to store keys: Keys already exist for this user.");
+                        }
+                        throw new Error(`Database error storing keys: ${insertError.message}`);
                     }
-                    throw new Error(`Database error storing keys: ${insertError.message}`);
-                }
-    
+
                 console.log("Keys stored successfully in database.");
                 set({ isLoading: false, error: null });
                 return { success: true };
-    
+
             } catch (error: any) {
                 console.error(`Attempt ${attempt + 1} to store keys failed:`, error.message);
-    
+
                 if (attempt === maxRetries - 1) {
-                    set({ isLoading: false, error: error.message || "Failed to store encryption keys after multiple attempts." });
-                    return { success: false, error: error.message };
+                    return handleAuthError(set, supabase, error, "Failed to store encryption keys after multiple attempts.");
                 }
-    
+
                 attempt++;
             }
         }
 
         // Ensure a return statement outside the loop
-        set({ isLoading: false, error: "Failed to store encryption keys after all attempts." });
-        return { success: false, error: "Failed to store encryption keys after all attempts." };
+        return handleAuthError(set, supabase, new Error("Failed to store encryption keys after all attempts."), "Failed to store encryption keys after all attempts.");
     },
 
+    /**
+     * Logs out the current user.
+     */
     logout: async () => {
         console.log("Logging out...");
         set({ isLoading: true, error: null });
@@ -394,69 +510,89 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
     },
 
-        // Assumes key data (salt, enc_key_recovery, iv_recovery) for the user
-    // has ALREADY been fetched securely (e.g., via a dedicated API route/server action using email)
-    // and passed into this function.
-    recoverWithKey: async (recoveryKeyString, saltB64, encKeyRecoveryB64, ivRecoveryB64) => {
+    //  Recovers the symmetric key using the recovery key.
+    //  Assumes key data (salt, enc_key_recovery, iv_recovery) for the user
+    //  has ALREADY been fetched securely (e.g., via a dedicated API route/server action using email)
+    //  and passed into this function.
+    //  @param recoveryKeyString - The user's recovery key.
+    //  @param saltB64 - The base64 encoded salt.
+    //  @param encKeyRecoveryB64 - The base64 encoded encrypted key (encrypted with recovery key).
+    //  @param ivRecoveryB64 - The base64 encoded IV for the encrypted key (encrypted with recovery key).
+    //  @returns An object with success: true if the key is recovered successfully, or success: false and an error message otherwise.
+
+    recoverWithKey: async (
+        recoveryKeyData: RecoveryKeyData
+    ): Promise<{ success: boolean; error?: string }> => {
         set({ isLoading: true, error: null, decryptedSymmetricKey: null }); // Clear previous key
-    
+
+        // Validate inputs
+        if (!recoveryKeyData.recoveryKeyString) {
+            return handleAuthError(set, null, new Error("Recovery key is required."), "Recovery key is required.");
+        }
+        if (!recoveryKeyData.saltB64) {
+            return handleAuthError(set, null, new Error("Salt is required."), "Salt is required.");
+        }
+        if (!recoveryKeyData.encKeyRecoveryB64) {
+            return handleAuthError(set, null, new Error("Encrypted key is required."), "Encrypted key is required.");
+        }
+        if (!recoveryKeyData.ivRecoveryB64) {
+            return handleAuthError(set, null, new Error("IV is required."), "IV is required.");
+        }
+
         try {
             console.log("Attempting key recovery...");
-    
-            // Validate inputs
-            if (!recoveryKeyString || !saltB64 || !encKeyRecoveryB64 || !ivRecoveryB64) {
-                throw new Error("Invalid recovery data provided. Please ensure all fields are filled.");
-            }
-    
+
             // 1. Decode fetched data
-            const salt = base64ToArrayBuffer(saltB64);
-            const encryptedKeyData = base64ToArrayBuffer(encKeyRecoveryB64);
-            const iv = base64ToArrayBuffer(ivRecoveryB64);
-    
+            const salt = base64ToArrayBuffer(recoveryKeyData.saltB64);
+            const encryptedKeyData = base64ToArrayBuffer(recoveryKeyData.encKeyRecoveryB64);
+            const iv = base64ToArrayBuffer(recoveryKeyData.ivRecoveryB64);
+
             // 2. Derive wrapping key from recovery string
             console.log("Deriving key from recovery string...");
-            const wrappingKey = await deriveKeyFromRecoveryString(recoveryKeyString, new Uint8Array(salt));
+            const wrappingKey = await deriveKeyFromRecoveryString(recoveryKeyData.recoveryKeyString, new Uint8Array(salt));
             console.log("Recovery key derived.");
-    
+
             // 3. Decrypt the symmetric key
             console.log("Decrypting symmetric key using recovery key...");
             const decryptedRawKey = await decryptKey(encryptedKeyData, new Uint8Array(iv), wrappingKey);
             console.log("Symmetric key decrypted.");
-    
+
             // 4. Import the raw key into a CryptoKey object
             const symmetricKey = await importSymmetricKey(decryptedRawKey);
             console.log("Symmetric key imported.");
-    
+
             // 5. Store the decrypted key in state
             set({ decryptedSymmetricKey: symmetricKey, isLoading: false, error: null });
             console.log("Decrypted key stored in memory for password reset.");
-    
+
             return { success: true };
-    
+
         } catch (error: any) {
-            console.error("Key recovery process error:", error);
-            set({ isLoading: false, error: error.message || "Failed to recover key. Invalid recovery key or data.", decryptedSymmetricKey: null });
-            return { success: false, error: error.message };
+            return handleAuthError(set, null, error, "Failed to recover key. Invalid recovery key or data.");
         }
     },
 
-    resetPasswordAndUpdateKeys: async (newPassword) => {
+    
+    //  Resets the user's password and updates the encryption keys.
+    //  @param newPassword - The new password.
+    //  @returns An object with success: true if the password is reset successfully, or success: false and an error message otherwise.
+    
+    resetPasswordAndUpdateKeys: async (newPassword: string): Promise<{ success: boolean; error?: string }> => {
         set({ isLoading: true, error: null });
         const supabase = createClient();
         const currentKey = get().decryptedSymmetricKey;
         const currentUser = get().user;
 
+        // Validate inputs
+        if (!newPassword || !isValidPassword(newPassword)) {
+            return handleAuthError(set, supabase, new Error("Invalid password. Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character."), "Invalid password. Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character.");
+        }
+
         if (!currentKey) {
-            const msg = "Cannot reset password: Decrypted symmetric key not available in memory. Please recover using your recovery key first.";
-            console.error(msg);
-            set({ isLoading: false, error: msg });
-            return { success: false, error: msg };
+            return handleAuthError(set, supabase, new Error("Cannot reset password: Decrypted symmetric key not available in memory. Please recover using your recovery key first."), "Cannot reset password: Decrypted symmetric key not available in memory. Please recover using your recovery key first.");
         }
         if (!currentUser) {
-            const msg = "Cannot reset password: No authenticated user found.";
-             console.error(msg);
-             set({ isLoading: false, error: msg });
-             return { success: false, error: msg };
+            return handleAuthError(set, supabase, new Error("Cannot reset password: No authenticated user found."), "Cannot reset password: No authenticated user found.");
         }
 
         console.log("Starting password reset and key re-encryption...");
@@ -503,7 +639,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 })
                 .eq('user_id', currentUser.id);
 
-            if (updateDbError) throw new Error(`Failed to update keys in database: ${updateDbError.message}`);
+            if (updateDbError) return handleAuthError(set, supabase, updateDbError, `Failed to update keys in database: ${updateDbError.message}`);
             console.log("User keys updated in database.");
 
             // 8. Optional: Re-derive the key with the new password/salt and update in memory?
@@ -521,11 +657,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             return { success: true };
 
         } catch (error: any) {
-            console.error("Password reset process error:", error);
-            set({ isLoading: false, error: error.message || "An unknown error occurred during password reset." });
-            // Note: State might be inconsistent here (e.g., password updated in Auth but not DB).
-            // Consider more robust transaction handling if possible or manual recovery steps.
-            return { success: false, error: error.message };
+            return handleAuthError(set, supabase, error, "An unknown error occurred during password reset.");
         }
     },
 
