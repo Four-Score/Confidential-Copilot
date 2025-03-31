@@ -12,6 +12,9 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --primary-navy: #0a192f;
+  --primary-light: #f8f9fa;
+  --accent-blue: #64ffda;  
 }
 
 
