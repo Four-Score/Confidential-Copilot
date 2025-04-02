@@ -158,3 +158,29 @@ This authentication system is designed with security by design and zero-trust pr
 - All key derivation and symmetric key decryption happens client-side.
 - Plaintext passwords/recovery keys and the decrypted symmetricKey never leave the browser.
 - Supabase Auth handles password verification using secure, salted hashes (stored internally by Supabase). Supabase cannot access the plaintext password and therefore cannot derive the wrapping keys or decrypt the user's symmetricKey.
+
+# File Breakdown: src/store/auth.ts
+
+- Purpose: Manages application authentication state (user, session) and handles client-side cryptography for user keys using Zustand. Implements a zero-trust key management system.
+
+- Core Principle: All cryptographic operations (key generation, derivation, encryption, decryption) happen client-side in the user's browser via the Web Crypto API. The plaintext symmetric encryption key (`decryptedSymmetricKey`) exists only in memory while the user is logged in and is never sent to the server or stored persistently.
+
+- State: Holds user, session, the sensitive `decryptedSymmetricKey` (in memory), `isLoading`, and `error` states. Provides an `isAuthenticated` helper.
+
+### Key Functions:
+
+- `initializeAuth`: Checks for an existing session on app load and sets up a Supabase listener (`onAuthStateChange`) that automatically updates user/session state and crucially clears the `decryptedSymmetricKey` from memory on logout.
+
+- `signup`: Handles Supabase user registration. Client-side: generates salt, main symmetric key, recovery key string. Derives password & recovery wrapping keys. Encrypts the symmetric key twice (once with password key, once with recovery key). Returns encrypted data, salt, and the plaintext recovery key string (for the user to save).
+
+- `storeGeneratedKeys`: Takes the encrypted keys/salt/IVs from signup (after user confirmation) and saves them to the `user_keys` table in Supabase.
+
+- `login`: Handles Supabase password authentication. Fetches the user's salt, password-encrypted key, and IV from the database. Client-side: re-derives the password wrapping key, decrypts the symmetric key, and stores the resulting `CryptoKey` in the `decryptedSymmetricKey` state (memory).
+
+- `logout`: Calls Supabase sign out. Relies on the `onAuthStateChange` listener to clear the user, session, and `decryptedSymmetricKey` state.
+
+- `recoverWithKey`: (Assumes necessary encrypted data/salt is pre-fetched securely). Client-side: Takes the user-entered recovery key string and the fetched data, derives the recovery wrapping key, decrypts the symmetric key, and stores it in memory (`decryptedSymmetricKey`), enabling a password reset.
+
+- `resetPasswordAndUpdateKeys`: (Requires `decryptedSymmetricKey` in memory). Updates the password in Supabase Auth. Client-side: Fetches the existing salt, derives a new wrapping key from the new password + existing salt, re-encrypts the symmetric key (from memory) using this new key. Updates only the password-related encrypted key (`enc_key_pw`) and IV (`iv_pw`) in the database, leaving the salt and recovery key data unchanged. Optionally updates the in-memory key for consistency.
+
+- Security: Ensures Supabase (or any server-side actor) cannot access the user's decrypted symmetric key, as the decryption password/recovery key is never sent to the server, and decryption happens only in the browser.

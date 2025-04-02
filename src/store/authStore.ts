@@ -599,11 +599,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
         try {
             // 1. Generate a NEW salt
-            const newSalt = generateSalt();
-            console.log("Generated new salt for password reset.");
+            const { data: keyData, error: saltFetchError } = await supabase
+                .from('user_keys')
+                .select('salt')
+                .eq('user_id', currentUser.id)
+                .single();
+
+            if (saltFetchError || !keyData?.salt) {
+                throw new Error("Failed to fetch current salt for password reset.");
+            }
+            const currentSaltB64 = keyData.salt;
+            const currentSalt = base64ToArrayBuffer(currentSaltB64);
 
             // 2. Derive a NEW wrapping key from the new password and new salt
-            const newWrappingKey = await deriveKeyFromPassword(newPassword, newSalt);
+            const newWrappingKey = await deriveKeyFromPassword(newPassword, new Uint8Array(currentSalt));
             console.log("Derived new password wrapping key.");
 
             // 3. Export the *existing* symmetric key (currently in memory)
@@ -613,8 +622,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             const { ciphertext: newEncKeyPw, iv: newIvPw } = await encryptKey(currentKey, newWrappingKey); // Re-use encryptKey with the new wrapping key
             console.log("Re-encrypted symmetric key with new password key.");
 
-            // 5. Encode new salt, ciphertext, and IV to Base64
-            const newSaltB64 = arrayBufferToBase64(newSalt.buffer as ArrayBuffer);
+            // 5. Encode the ciphertext and IV to Base64
             const newEncKeyPwB64 = arrayBufferToBase64(newEncKeyPw);
             const newIvPwB64 = arrayBufferToBase64(newIvPw.buffer as ArrayBuffer);
 
@@ -626,13 +634,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             if (updateAuthError) throw new Error(`Failed to update password in Supabase Auth: ${updateAuthError.message}`);
             console.log("Supabase Auth password updated.");
 
-            // 7. Update the user_keys table with the new salt, enc_key_pw, iv_pw
+            // 7. Update the user_keys table with the enc_key_pw and iv_pw
             // Note: enc_key_recovery and iv_recovery remain unchanged
             console.log("Updating user_keys table in database...");
             const { error: updateDbError } = await supabase
                 .from('user_keys')
                 .update({
-                    salt: newSaltB64,
                     enc_key_pw: newEncKeyPwB64,
                     iv_pw: newIvPwB64,
                     // updated_at is handled by trigger (if set up)
@@ -645,7 +652,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             // 8. Optional: Re-derive the key with the new password/salt and update in memory?
             // This ensures the key in memory matches the *new* password derivation immediately.
             // Alternatively, require a new login, but this is smoother.
-             const reDerivedKey = await deriveKeyFromPassword(newPassword, newSalt);
+             const reDerivedKey = await deriveKeyFromPassword(newPassword, new Uint8Array(currentSalt));
              const reDecryptedRaw = await decryptKey(newEncKeyPw, newIvPw, reDerivedKey);
              const finalSymmetricKey = await importSymmetricKey(reDecryptedRaw);
              set({ decryptedSymmetricKey: finalSymmetricKey });
