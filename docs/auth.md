@@ -70,6 +70,25 @@ This authentication system is designed with security by design and zero-trust pr
 - Supabase Security: The Supabase project should be configured with appropriate security measures, such as network restrictions and regular security audits.
 - Code Security: The client-side code should be regularly reviewed for security vulnerabilities.
 
+# Directory Structure (backend auth relevant folders and files):
+```
+src/
+├── app/
+├── components/
+├── features/
+├── lib/
+│   ├── crypto.ts # Client-side crypto functions
+│   └── supabase/
+│       ├── client.ts # Supabase browser client
+│       ├── middleware.ts # Session refresh logic
+│       └── server.ts # Supabase server client
+├── store/
+│   └── authStore.ts # Manages authentication state
+├── types/
+│   └── auth.ts # Authentication related types
+└── middleware.ts # Calls session update function from lib/supabase/middleware.ts
+
+```
 
 # Folder Breakdown: src/lib/supabase
 
