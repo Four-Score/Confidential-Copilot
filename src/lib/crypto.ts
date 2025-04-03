@@ -91,7 +91,7 @@ export async function deriveKeyFromPassword(password: string, salt: Uint8Array):
     baseKey,
     { name: 'AES-GCM', length: 256 }, // Algorithm the derived key will be used for
     true, // Make the derived key extractable (for potential debugging, though not strictly needed for wrap/unwrap) - changed to true for consistency, wrapKey/unwrapKey usage is sufficient
-    ['wrapKey', 'unwrapKey'] // Key usages
+    ['wrapKey', 'unwrapKey', 'encrypt', 'decrypt'] // Key usages
   );
 
   return derivedKey;
@@ -152,7 +152,7 @@ export async function deriveKeyFromRecoveryString(recoveryKeyString: string, sal
             hashBuffer,
             { name: 'AES-GCM', length: 256 },
             true, // Extractable (consistent with password derived key)
-            ['wrapKey', 'unwrapKey'] // Key usages
+            ['wrapKey', 'unwrapKey', 'encrypt', 'decrypt'] // Key usages
         );
         return derivedKey;
     } catch (error) {

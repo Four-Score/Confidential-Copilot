@@ -25,3 +25,20 @@ export interface RecoveryKeyData {
     encKeyRecoveryB64: string;
     ivRecoveryB64: string;
 }
+
+// Enum for the sign-up flow steps
+export enum SignUpStep {
+    CREDENTIALS = 0,
+    RECOVERY_KEY = 1,
+    SUCCESS = 2,
+  }
+
+// Props for the RecoveryKeyDisplay component
+export interface RecoveryKeyDisplayProps {
+    recoveryKeyString: string;
+    isChecked: boolean;
+    onCheckChange: (checked: boolean) => void;
+    onContinue: () => void;
+    onGoBack: () => void;
+    isLoading: boolean;
+  }

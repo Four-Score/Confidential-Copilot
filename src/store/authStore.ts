@@ -443,6 +443,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
         console.log("Storing generated keys for user:", keyMaterial.userId);
 
+        if (currentUser.id !== keyMaterial.userId) {
+            console.error("User ID mismatch:", currentUser.id, keyMaterial.userId);
+            return handleAuthError(set, supabase, new Error("User ID mismatch: The user ID in the key material does not match the current user's ID."), "User ID mismatch: The user ID in the key material does not match the current user's ID.");
+        }
+
+        const auth = await supabase.auth.getUser();
+        console.log("Current user ID from auth:", auth?.data?.user?.id);
+        console.log("Current user ID from store:", currentUser.id);
+        console.log("Key material user ID:", keyMaterial.userId);
+        
         const maxRetries = 3;
         let attempt = 0;
 
@@ -479,7 +489,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
             } catch (error: any) {
                 console.error(`Attempt ${attempt + 1} to store keys failed:`, error.message);
-
+                console.log("RLS violation details:", {
+                    userIdFromAuth: auth?.data?.user?.id,
+                    userIdFromStore: currentUser.id,
+                    userIdFromKeyMaterial: keyMaterial.userId
+                });
                 if (attempt === maxRetries - 1) {
                     return handleAuthError(set, supabase, error, "Failed to store encryption keys after multiple attempts.");
                 }
