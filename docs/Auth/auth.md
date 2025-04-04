@@ -203,3 +203,91 @@ src/
 - `resetPasswordAndUpdateKeys`: (Requires `decryptedSymmetricKey` in memory). Updates the password in Supabase Auth. Client-side: Fetches the existing salt, derives a new wrapping key from the new password + existing salt, re-encrypts the symmetric key (from memory) using this new key. Updates only the password-related encrypted key (`enc_key_pw`) and IV (`iv_pw`) in the database, leaving the salt and recovery key data unchanged. Optionally updates the in-memory key for consistency.
 
 - Security: Ensures Supabase (or any server-side actor) cannot access the user's decrypted symmetric key, as the decryption password/recovery key is never sent to the server, and decryption happens only in the browser.
+
+# File Breakdown: src/services/database.ts: Database Service
+
+- Purpose: Provides a unified service for all database interactions related to user authentication and key management. Abstracts Supabase client calls for cleaner code and easier maintenance.
+
+## Key Functions:
+
+- `fetchUserKeys(userId: string)`: Fetches encrypted key data (salt, encrypted symmetric key, IVs) for a given user ID from the `user_keys` table. Returns `null` if not found.
+
+- `storeUserKeys(keyMaterial: KeyMaterial)`: Stores the encrypted key data generated during signup into the `user_keys` table. Handles potential unique constraint violations (duplicate user keys).
+
+- `fetchUserSalt(userId: string)`: Fetches only the salt for a given user ID. Used during password reset.
+
+- `checkUserExists(email: string)`: Checks if a user exists in the `auth.users` table by email via the `/api/check-user-exists` API route.
+
+- `updateUserPasswordKey(userId: string, encKeyPwB64: string, ivPwB64: string)`: Updates the password-encrypted symmetric key and IV in the `user_keys` table during password reset.
+
+## Usage Notes:
+
+- All functions use the Supabase client (`createClient` from `@/lib/supabase/client`).
+- Error handling is centralized within each function, returning a `success: false` object with an error message on failure.
+- This service promotes separation of concerns by isolating database logic from the authentication store.
+
+# File Breakdown: src/app/api/check-user-exists/route.ts: 
+
+- Purpose: Provides a server-side API endpoint to check if a user exists in the `auth.users` table by email. Used by the `checkUserExists` function in `src/services/database.ts`.
+
+## Key Function:
+
+- `POST(request: Request)`:
+  - Receives an email address in the request body.
+  - Uses the Supabase server client (`createRouteHandlerClient` from `@supabase/auth-helpers-nextjs`) to query the `auth.users` table.
+  - Returns a JSON response with a `userExists` boolean indicating whether a user with the given email exists.
+  - Returns error responses for invalid requests or database errors.
+
+## Security Notes:
+
+- This route uses the server-side Supabase client, which has elevated privileges, to access the `auth.users` table.
+- Input validation is performed to ensure the email is provided in the request body.
+- Error responses are generic to avoid exposing sensitive information.
+
+# Frontend Authentication Components Documentation
+
+This section provides a concise overview of the key frontend components involved in the authentication flow.
+
+## `src/app/(auth)/sign-up/page.tsx` & `src/app/(auth)/log-in/page.tsx`: Page Components
+
+-   Purpose: These files are the entry points for the sign-up and log-in pages, respectively.
+-   Functionality: They import and render the `SignUpForm` and `LoginForm` components within a basic layout.
+
+## `src/components/auth/SignUpForm.tsx`: Sign-Up Form Component
+
+-   Purpose: Handles the user sign-up process, including collecting credentials, displaying the recovery key, and storing encrypted keys.
+-   Key Features:
+    -   Multi-step form using `useState` for managing the current step (`SignUpStep.CREDENTIALS`, `SignUpStep.RECOVERY_KEY`, `SignUpStep.SUCCESS`).
+    -   Client-side validation of email and password.
+    -   Calls `signup` from `authStore.ts` to initiate the sign-up process.
+    -   Renders `RecoveryKeyDisplay.tsx` to show the recovery key.
+    -   Calls `storeGeneratedKeys` from `authStore.ts` to store the encrypted keys after user confirmation.
+    -   Handles loading and error states.
+
+## `src/components/auth/LoginForm.tsx`: Log-In Form Component
+
+-   Purpose: Handles the user log-in process.
+-   Key Features:
+    -   Collects user email and password.
+    -   Client-side validation of email and password.
+    -   Calls `login` from `authStore.ts` to authenticate the user.
+    -   Redirects to the dashboard on successful login.
+    -   Handles loading and error states.
+
+## `src/components/auth/RecoveryKeyDisplay.tsx`: Recovery Key Display Component
+
+-   Purpose: Displays the recovery key to the user and provides copy-to-clipboard functionality.
+-   Key Features:
+    -   Displays the recovery key string.
+    -   Provides a button to copy the recovery key to the clipboard.
+    -   Includes a checkbox for the user to confirm that they have saved the recovery key.
+    -   Uses a modal for display.
+
+## `src/components/auth/PasswordRequirements.tsx`: Password Requirements Component
+
+-   Purpose: Displays password requirements with visual indicators.
+-   Key Features:
+    -   Shows a list of password requirements (e.g., minimum length, uppercase letter, etc.).
+    -   Uses green checkmarks to indicate which requirements are met.
+
+

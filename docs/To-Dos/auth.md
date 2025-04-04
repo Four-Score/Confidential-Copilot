@@ -40,11 +40,3 @@ The code doesn't explicitly address timing attacks.
 Vulnerability: Timing attacks can potentially reveal information about the password or recovery key.
 
 Recommendation: Implement countermeasures against timing attacks, such as using constant-time comparison functions for password and recovery key verification.
-
-## API Route /api/check-user-exists
-
-The code in `authStore.ts` makes a call to `/api/check-user-exists` to determine if a user exists. The code for this API route was not provided.
-
-Vulnerability: Without seeing the code for this API route, it's impossible to assess its security.
-
-Recommendation: Ensure that the `/api/check-user-exists` route is properly secured and doesn't leak sensitive information.
