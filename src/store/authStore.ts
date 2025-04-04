@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { User, Session } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client'; // Use the browser client
+import { userDbService } from '@/services/database';
 import {
     deriveKeyFromPassword,
     deriveKeyFromRecoveryString,
@@ -260,25 +261,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
             // 2. Fetch encrypted keys and salt from DB
             console.log("Fetching user keys...");
-            const { data: keyData, error: keyFetchError } = await supabase
-                .from('user_keys')
-                .select('salt, enc_key_pw, iv_pw, enc_key_recovery, iv_recovery')
-                .eq('user_id', user.id)
-                .single(); // Expect exactly one row
+            const fetchedKeyData = await userDbService.fetchUserKeys(user.id);
 
-                if (keyFetchError) {
-                    // Distinguish between "not found" and other errors
-                    if (keyFetchError.code === 'PGRST116') { // PostgREST code for "Resource Not Found"
-                         console.warn("User keys not found. Signup might be incomplete.");
-                         set({ isLoading: false, error: "Encryption keys not found. Please complete signup or contact support." });
-                         // Optionally return a specific flag if needed by UI
-                         return { success: false, error: "Encryption keys not found.", recoveryKeyNeeded: true }; // Indicate potential signup issue
-                    }
-                     return handleAuthError(set, supabase, keyFetchError, `Failed to fetch keys: ${keyFetchError.message}`);
+                if (!fetchedKeyData) {
+                    console.warn("User keys not found. Signup might be incomplete.");
+                    set({ isLoading: false, error: "Encryption keys not found. Please complete signup or contact support." });
+                    return { success: false, error: "Encryption keys not found.", recoveryKeyNeeded: true };
                 }
 
                 // Type assert keyData as EncryptedKeyData
-                const encryptedKeyData: EncryptedKeyData = keyData as EncryptedKeyData;
+                const encryptedKeyData: EncryptedKeyData = fetchedKeyData as EncryptedKeyData;
 
                 if (!encryptedKeyData || !encryptedKeyData.salt || !encryptedKeyData.enc_key_pw || !encryptedKeyData.iv_pw) {
                     return handleAuthError(set, supabase, new Error("Incomplete key data fetched from database."), "Incomplete key data fetched from database.");
@@ -356,14 +348,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             // Handle cases where user exists but isn't confirmed, or general lack of user data
             if (!signUpData.user) {
                 // Check if user might exist but needs confirmation
-                const { data } = await fetch('/api/check-user-exists', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email })
-                }).then(res => res.json());
+                const userExists = await userDbService.checkUserExists(email);
                 
-                // Use the data from the API response instead of signUpError
-                if (data?.userExists) {
+                if (userExists) {
                     return handleAuthError(set, supabase, new Error("User already exists. Please log in or confirm your email."), "User already exists. Please log in or confirm your email.");
                 }
                 
@@ -463,25 +450,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                     throw new Error("Invalid key material: Missing required fields.");
                 }
 
-                const { error: insertError } = await supabase
-                    .from('user_keys')
-                    .insert({
-                        user_id: keyMaterial.userId,
-                        salt: keyMaterial.saltB64,
-                        enc_key_pw: keyMaterial.encKeyPwB64,
-                        iv_pw: keyMaterial.ivPwB64,
-                        enc_key_recovery: keyMaterial.encKeyRecoveryB64,
-                        iv_recovery: keyMaterial.ivRecoveryB64,
-                    });
+                const result = await userDbService.storeUserKeys(keyMaterial);
 
-                    if (insertError) {
-                        // Handle potential unique constraint violation if keys already exist
-                        if (insertError.code === '23505') { // PostgreSQL unique violation code
-                            console.warn(`Keys already exist for user ${keyMaterial.userId}.`);
-                            return handleAuthError(set, supabase, new Error("Failed to store keys: Keys already exist for this user."), "Failed to store keys: Keys already exist for this user.");
-                        }
-                        throw new Error(`Database error storing keys: ${insertError.message}`);
-                    }
+                if (!result.success) {
+                    return handleAuthError(
+                        set, 
+                        supabase, 
+                        new Error(`Failed to store keys: ${result.error}`), 
+                        `Failed to store keys: ${result.error}`
+                    );
+                }
 
                 console.log("Keys stored successfully in database.");
                 set({ isLoading: false, error: null });
@@ -613,16 +591,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
         try {
             // 1. Generate a NEW salt
-            const { data: keyData, error: saltFetchError } = await supabase
-                .from('user_keys')
-                .select('salt')
-                .eq('user_id', currentUser.id)
-                .single();
+            const currentSaltB64 = await userDbService.fetchUserSalt(currentUser.id);
 
-            if (saltFetchError || !keyData?.salt) {
+            if (!currentSaltB64) {
                 throw new Error("Failed to fetch current salt for password reset.");
             }
-            const currentSaltB64 = keyData.salt;
             const currentSalt = base64ToArrayBuffer(currentSaltB64);
 
             // 2. Derive a NEW wrapping key from the new password and new salt
@@ -651,16 +624,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             // 7. Update the user_keys table with the enc_key_pw and iv_pw
             // Note: enc_key_recovery and iv_recovery remain unchanged
             console.log("Updating user_keys table in database...");
-            const { error: updateDbError } = await supabase
-                .from('user_keys')
-                .update({
-                    enc_key_pw: newEncKeyPwB64,
-                    iv_pw: newIvPwB64,
-                    // updated_at is handled by trigger (if set up)
-                })
-                .eq('user_id', currentUser.id);
-
-            if (updateDbError) return handleAuthError(set, supabase, updateDbError, `Failed to update keys in database: ${updateDbError.message}`);
+            const updateResult = await userDbService.updateUserPasswordKey(
+                currentUser.id,
+                newEncKeyPwB64,
+                newIvPwB64
+            );
+            
+            if (!updateResult.success) {
+                return handleAuthError(
+                    set, 
+                    supabase, 
+                    new Error(updateResult.error || "Unknown error"), 
+                    `Failed to update keys in database: ${updateResult.error}`
+                );
+            }
             console.log("User keys updated in database.");
 
             // 8. Optional: Re-derive the key with the new password/salt and update in memory?
