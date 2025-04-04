@@ -73,6 +73,9 @@ This authentication system is designed with security by design and zero-trust pr
 # Directory Structure (backend auth relevant folders and files):
 ```
 src/
+├── api/    
+│    └── check-user-exists
+│        └── route.ts # API route through Supabase to check user exists 
 ├── app/
 ├── components/
 ├── features/
@@ -82,6 +85,8 @@ src/
 │       ├── client.ts # Supabase browser client
 │       ├── middleware.ts # Session refresh logic
 │       └── server.ts # Supabase server client
+├── services/
+│   └── database.ts # All database queries
 ├── store/
 │   └── authStore.ts # Manages authentication state
 ├── types/
