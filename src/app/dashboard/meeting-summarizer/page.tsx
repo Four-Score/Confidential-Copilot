@@ -17,6 +17,7 @@ export default function MeetingSummarizerPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<{ summary: string; action_items: ActionItem[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [responseDetails, setResponseDetails] = useState<string | null>(null);
   
   const router = useRouter();
   const { isAuthenticated, user } = useAuthStore();
@@ -36,6 +37,7 @@ export default function MeetingSummarizerPage() {
   const handleTranscriptReady = (text: string) => {
     setTranscriptText(text);
     setError(null);
+    setResponseDetails(null);
   };
 
   const handleProcess = async () => {
@@ -46,9 +48,12 @@ export default function MeetingSummarizerPage() {
 
     setIsProcessing(true);
     setError(null);
+    setResponseDetails(null);
 
     try {
-      // Call the API endpoint instead of the direct function
+      console.log("Sending request to process transcript API...");
+      
+      // Call the API endpoint
       const response = await fetch('/api/process-transcript', {
         method: 'POST',
         headers: {
@@ -57,13 +62,42 @@ export default function MeetingSummarizerPage() {
         body: JSON.stringify({ transcript: transcriptText }),
       });
 
-      if (!response.ok) {
-        // Handle HTTP errors
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to process transcript');
+      console.log("Response received:", response.status, response.statusText);
+      
+      // Capture response details for debugging
+      const contentType = response.headers.get('content-type');
+      console.log("Content-Type:", contentType);
+      
+      // Get the raw text response for debugging
+      const rawText = await response.text();
+      
+      // Store first 500 chars of response for debugging
+      const previewText = rawText.slice(0, 500) + (rawText.length > 500 ? '...' : '');
+      setResponseDetails(`Status: ${response.status} ${response.statusText}\nContent-Type: ${contentType}\nPreview: ${previewText}`);
+      
+      // If the response doesn't look like JSON, throw an error
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error(`Server returned a non-JSON response (${contentType})`);
+      }
+      
+      // Parse the response as JSON
+      let result;
+      try {
+        result = JSON.parse(rawText);
+      } catch (e) {
+        throw new Error(`Failed to parse response as JSON: ${e instanceof Error ? e.message : 'Unknown parsing error'}`);
       }
 
-      const result = await response.json();
+      if (!response.ok) {
+        // Handle HTTP errors
+        throw new Error(result.error || `Failed to process transcript (Status ${response.status})`);
+      }
+      
+      // Validate the result structure
+      if (!result.summary || !Array.isArray(result.action_items)) {
+        throw new Error('Invalid response format from server');
+      }
+      
       setResults(result);
     } catch (err: any) {
       console.error('Error processing transcript:', err);
@@ -107,7 +141,15 @@ export default function MeetingSummarizerPage() {
 
       {error && (
         <div className="mb-6 p-4 bg-red-100 text-red-700 rounded-lg border border-red-300">
-          {error}
+          <p className="font-semibold">Error:</p>
+          <p>{error}</p>
+        </div>
+      )}
+
+      {responseDetails && (
+        <div className="mb-6 p-4 bg-gray-100 text-gray-800 rounded-lg border border-gray-300 overflow-auto">
+          <p className="font-semibold">Response Details (for debugging):</p>
+          <pre className="whitespace-pre-wrap text-xs mt-2">{responseDetails}</pre>
         </div>
       )}
 
