@@ -71,6 +71,24 @@ export default function MeetingSummarizerPage() {
         <MeetingResults
           summary={results.summary}
           actionItems={results.action_items}
+          onDownloadSummary={() => {
+            const blob = new Blob([results.summary], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'summary.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          onDownloadActionItems={() => {
+            const blob = new Blob([JSON.stringify(results.action_items, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'action_items.json';
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
         />
       )}
     </div>
