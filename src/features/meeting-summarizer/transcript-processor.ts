@@ -36,9 +36,28 @@ async function callGroqAPI(messages: any[]) {
       {
         role: "system",
         content: `
-          You are an expert meeting assistant. Your task is to create a comprehensive 
-          summary of the provided meeting transcript. Focus on key discussion points, 
-          decisions made, and the overall narrative of the meeting. Be concise yet thorough.
+          You are an expert meeting assistant. Your task is to create a comprehensive summary of the provided meeting transcript.
+          Please format your response as follows, using only plain text (no Markdown, no asterisks, no special symbols):
+
+          MEETING SUMMARY:
+          [One or two sentences summarizing the meeting.]
+
+          KEY DISCUSSION POINTS:
+          - Point 1
+          - Point 2
+          - ...
+
+          DECISIONS MADE:
+          - Decision 1
+          - Decision 2
+          - ...
+
+          NEXT STEPS:
+          - Step 1
+          - Step 2
+          - ...
+
+          Do not use any Markdown formatting, asterisks, or special symbols except dashes for bullet points and colons for section headers.
         `
       },
       {
@@ -81,13 +100,27 @@ async function callGroqAPI(messages: any[]) {
       }
     ];
     
+    function extractJSONArray(text: string): string | null {
+      const match = text.match(/\[([\s\S]*?)\]/);
+      return match ? match[0] : null;
+    }
+
     try {
       const responseContent = await callGroqAPI(messages);
-      
+
+      // Try to parse as JSON directly
       try {
-        // Try to parse the response as JSON
         return JSON.parse(responseContent);
       } catch (e) {
+        // Try to extract JSON array from the response
+        const jsonArray = extractJSONArray(responseContent);
+        if (jsonArray) {
+          try {
+            return JSON.parse(jsonArray);
+          } catch (e2) {
+            console.error("Failed to parse extracted JSON array:", e2);
+          }
+        }
         console.error("Failed to parse action items JSON, trying with follow-up prompt:", e);
         
         // If JSON parsing fails, try to extract structured data using a follow-up prompt

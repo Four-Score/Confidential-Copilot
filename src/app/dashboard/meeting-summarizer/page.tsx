@@ -52,6 +52,13 @@ export default function MeetingSummarizerPage() {
     }
   };
 
+  // Helper to convert action items to readable text
+  function actionItemsToText(actionItems: ActionItem[]): string {
+    return actionItems.map((item, idx) =>
+      `Action Item ${idx + 1}:\nTask: ${item.task}\nAssignee: ${item.assignee ?? 'N/A'}\nDeadline: ${item.deadline ?? 'N/A'}\n`
+    ).join('\n');
+  }
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold mb-6">Meeting Summarizer</h1>
@@ -81,11 +88,12 @@ export default function MeetingSummarizerPage() {
             URL.revokeObjectURL(url);
           }}
           onDownloadActionItems={() => {
-            const blob = new Blob([JSON.stringify(results.action_items, null, 2)], { type: 'application/json' });
+            const text = actionItemsToText(results.action_items);
+            const blob = new Blob([text], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'action_items.json';
+            a.download = 'action_items.txt';
             a.click();
             URL.revokeObjectURL(url);
           }}
