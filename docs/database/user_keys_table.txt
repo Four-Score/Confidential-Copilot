@@ -1,0 +1,59 @@
+-- Create the user_keys table
+CREATE TABLE public.user_keys (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID UNIQUE NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    -- Encrypted symmetric key (using password-derived key)
+    enc_key_pw TEXT NOT NULL,
+    iv_pw TEXT NOT NULL,
+    -- Encrypted symmetric key (using recovery key)
+    enc_key_recovery TEXT NOT NULL,
+    iv_recovery TEXT NOT NULL,
+    -- Salt used for PBKDF2 password key derivation
+    salt TEXT NOT NULL,
+    -- Timestamps
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+-- Optional: Trigger to update 'updated_at' timestamp
+CREATE OR REPLACE FUNCTION public.handle_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER on_user_keys_updated
+  BEFORE UPDATE ON public.user_keys
+  FOR EACH ROW
+  EXECUTE PROCEDURE public.handle_updated_at();
+
+-- Alter table to enable Row Level Security
+ALTER TABLE public.user_keys ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies
+-- Policy: Allow users to read their own keys
+CREATE POLICY "Allow individual user read access"
+ON public.user_keys
+FOR SELECT
+USING (auth.uid() = user_id);
+
+-- Policy: Allow users to insert their own keys (should only happen once at signup)
+CREATE POLICY "Allow individual user insert access"
+ON public.user_keys
+FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+-- Policy: Allow users to update their own keys (e.g., during password reset)
+CREATE POLICY "Allow individual user update access"
+ON public.user_keys
+FOR UPDATE
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- Note: Deletion is handled by ON DELETE CASCADE, but if needed:
+-- CREATE POLICY "Allow individual user delete access"
+-- ON public.user_keys
+-- FOR DELETE
+-- USING (auth.uid() = user_id);
