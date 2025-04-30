@@ -1,4 +1,4 @@
-const DCPE = require('dcpe-js');
+import { DCPE } from 'dcpe-js';
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { arrayBufferToBase64, base64ToArrayBuffer } from './crypto';
@@ -9,7 +9,7 @@ import { arrayBufferToBase64, base64ToArrayBuffer } from './crypto';
  * authentication system for key security.
  */
 export class EncryptionService {
-  private dcpe: typeof DCPE | null = null;
+  private dcpe: InstanceType<typeof DCPE> | null = null;
   private initialized = false;
   private symmetricKey: CryptoKey | null = null;
   private dcpeKeysString: string | null = null;

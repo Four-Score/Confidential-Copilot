@@ -1,6 +1,9 @@
-import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
-import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
-import { Document } from "@langchain/core/documents";
+import * as pdfjs from 'pdfjs-dist';
+
+// Configure the worker source for PDF.js
+if (typeof window !== 'undefined') {
+  pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+}
 
 /**
  * Maximum file size in bytes (5MB)
@@ -66,52 +69,67 @@ export interface PDFExtractionResult {
 }
 
 /**
- * Extracts text and metadata from a PDF file
+ * Extracts text and metadata from a PDF file using PDF.js
  * @param file PDF file to extract from
  * @returns Promise resolving to extraction result with text and metadata
  */
 export async function extractTextFromPdf(file: File): Promise<PDFExtractionResult> {
   try {
-    // Convert File to Blob and then to ArrayBuffer
+    // Convert File to ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
     
-    // Create a temporary Blob URL to use with PDFLoader
-    const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
+    // Load the PDF using PDF.js
+    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
     
-    // Use PDFLoader to load the document
-    const loader = new PDFLoader(url, {
-      splitPages: false, // Get full document in one piece
-      parsedItemSeparator: ' ' // Join text elements with space
-    });
+    // Extract text from each page
+    let fullText = '';
+    const numPages = pdf.numPages;
     
-    // Load the document
-    const docs = await loader.load();
+    for (let i = 1; i <= numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = content.items
+        .map((item: any) => item.str)
+        .join(' ');
+      fullText += pageText + '\n\n';
+    }
     
-    // Extract metadata from LangChain document
-    const langchainMetadata = docs[0]?.metadata?.pdf || {};
+    // Get metadata
+    const metadata = await pdf.getMetadata().catch(() => ({
+      info: {},
+      metadata: null
+    }));
     
-    // Parse and format metadata
-    const metadata = {
-      title: langchainMetadata.info?.Title || file.name,
-      author: langchainMetadata.info?.Author,
-      subject: langchainMetadata.info?.Subject,
-      keywords: langchainMetadata.info?.Keywords,
-      creator: langchainMetadata.info?.Creator,
-      producer: langchainMetadata.info?.Producer,
-      creationDate: langchainMetadata.info?.CreationDate,
-      modificationDate: langchainMetadata.info?.ModDate,
-      pageCount: langchainMetadata.totalPages || 1,
-      fileName: file.name,
-      fileSize: file.size,
-    };
+    // Define PDF info structure for type safety
+    interface PDFInfo {
+      Title?: string;
+      Author?: string;
+      Subject?: string;
+      Keywords?: string;
+      Creator?: string;
+      Producer?: string;
+      CreationDate?: string;
+      ModDate?: string;
+      [key: string]: any; // For any other properties
+    }
     
-    // Clean up URL after use
-    URL.revokeObjectURL(url);
+    const info = (metadata.info as PDFInfo) || {};
     
     return {
-      text: docs[0]?.pageContent || '',
-      metadata
+      text: fullText.trim(),
+      metadata: {
+        title: info.Title || file.name,
+        author: info.Author,
+        subject: info.Subject,
+        keywords: info.Keywords,
+        creator: info.Creator,
+        producer: info.Producer,
+        creationDate: info.CreationDate,
+        modificationDate: info.ModDate,
+        pageCount: numPages,
+        fileName: file.name,
+        fileSize: file.size
+      }
     };
   } catch (error) {
     console.error('Error extracting text from PDF:', error);
@@ -146,40 +164,26 @@ export async function chunkText(
   chunkSize = DEFAULT_CHUNK_SIZE,
   chunkOverlap = DEFAULT_CHUNK_OVERLAP
 ): Promise<DocumentChunk[]> {
-  try {
-    // Create splitter for chunking
-    const splitter = new RecursiveCharacterTextSplitter({
-      chunkSize,
-      chunkOverlap,
-    });
-    
-    // Create LangChain Document with text and metadata
-    const doc = new Document({
-      pageContent: text,
+  // Simple sliding window chunking
+  const chunks: DocumentChunk[] = [];
+  let start = 0;
+  let chunkNumber = 1;
+  while (start < text.length) {
+    const end = Math.min(start + chunkSize, text.length);
+    const chunkText = text.slice(start, end);
+    chunks.push({
+      content: chunkText,
       metadata: {
+        chunkNumber,
         fileName: metadata.fileName,
         documentId: metadata.documentId,
-      },
+      }
     });
-    
-    // Split the document into chunks
-    const chunks = await splitter.splitDocuments([doc]);
-    
-    // Format chunks into our DocumentChunk interface
-    return chunks.map((chunk: Document, index: number) => ({
-      content: chunk.pageContent,
-      metadata: {
-        chunkNumber: index + 1,
-        fileName: metadata.fileName,
-        documentId: metadata.documentId,
-        // Extract page number if available in the chunk metadata
-        pageNumber: chunk.metadata.loc?.pageNumber,
-      },
-    }));
-  } catch (error) {
-    console.error('Error chunking text:', error);
-    throw new Error(`Failed to chunk text: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    chunkNumber++;
+    start += chunkSize - chunkOverlap;
+    if (start < 0 || start >= text.length) break;
   }
+  return chunks;
 }
 
 /**

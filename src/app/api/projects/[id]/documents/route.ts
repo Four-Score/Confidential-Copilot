@@ -20,6 +20,50 @@ interface DocumentUploadBody {
 }
 
 /**
+ * Retries a database operation with exponential backoff
+ * @param operation Function to retry
+ * @param maxRetries Maximum number of retries
+ * @param initialDelay Initial delay in milliseconds
+ */
+async function retryOperation<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  initialDelay: number = 300
+): Promise<T> {
+  let lastError: Error;
+  let delay = initialDelay;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error as Error;
+      
+      // Check if we should retry based on error type
+      // Common transient errors: connection issues, deadlocks, etc.
+      const isTransientError = 
+        error instanceof Error && 
+        (error.message.includes('timeout') || 
+         error.message.includes('connection') ||
+         error.message.includes('deadlock') ||
+         error.message.toLowerCase().includes('temporarily unavailable'));
+      
+      if (!isTransientError || attempt === maxRetries) {
+        throw error;
+      }
+      
+      console.warn(`Operation failed, retrying (${attempt + 1}/${maxRetries})...`, error);
+      
+      // Wait with exponential backoff
+      await new Promise(resolve => setTimeout(resolve, delay));
+      delay *= 2; // Exponential backoff
+    }
+  }
+  
+  throw lastError!;
+}
+
+/**
  * Handles document upload for a specific project
  * POST: Creates a new document with its vector chunks
  */
@@ -30,7 +74,7 @@ export async function POST(
   try {
     const projectId = params.id;
     
-    // Initialize Supabase client with cookies
+    // Initialize Supabase client
     const supabase = await createClient();
     
     // Check if user is authenticated
@@ -42,11 +86,11 @@ export async function POST(
       );
     }
     
-    // Verify project access and ownership
+    // Verify that the project exists and belongs to the user
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('id, user_id')
-      .eq('id', projectId) // Use the projectId variable (which now holds params.id)
+      .select('id')
+      .eq('id', projectId)
       .eq('user_id', session.user.id)
       .single();
       
@@ -58,72 +102,42 @@ export async function POST(
     }
     
     // Parse request body
-    const body = await req.json() as DocumentUploadBody;
+    const body = await req.json();
     
-    // Start a transaction to ensure atomic operations
-    // Note: Ideally we would use a transaction, but we'll use sequential operations for now
+    // Start a transaction using Supabase's built-in transaction support
+    const { data: documentData, error: transactionError } = await supabase.rpc(
+      'insert_document_with_chunks',
+      {
+        p_project_id: projectId,
+        p_name: body.name,
+        p_original_name: body.originalName,
+        p_type: body.type,
+        p_file_size: body.fileSize,
+        p_page_count: body.pageCount,
+        p_encrypted_content: body.encryptedContent,
+        p_encrypted_metadata: body.encryptedMetadata,
+        p_chunks: body.chunks
+      }
+    );
     
-    // 1. Insert the document
-    const { data: document, error: documentError } = await supabase
-      .from('documents')
-      .insert({
-        project_id: projectId,
-        name: body.name,
-        type: body.type,
-        encrypted_content: body.encryptedContent,
-        encrypted_metadata: body.encryptedMetadata,
-        file_size: body.fileSize,
-        page_count: body.pageCount
-      })
-      .select()
-      .single();
-      
-    if (documentError) {
-      console.error('Error creating document:', documentError);
+    if (transactionError) {
+      console.error('Transaction error:', transactionError);
       return NextResponse.json(
-        { error: 'Failed to create document' },
+        { error: 'Failed to store document' },
         { status: 500 }
       );
     }
     
-    // 2. Insert vector chunks
-    const chunksToInsert = body.chunks.map(chunk => ({
-      document_id: document.id,
-      chunk_number: chunk.chunkNumber,
-      encrypted_chunk_content: chunk.encryptedContent,
-      encrypted_embeddings: chunk.encryptedEmbeddings,
-      metadata: chunk.metadata
-    }));
-    
-    const { error: chunksError } = await supabase
-      .from('vector_chunks')
-      .insert(chunksToInsert);
-      
-    if (chunksError) {
-      console.error('Error creating vector chunks:', chunksError);
-      
-      // Attempt to clean up the document if chunks insert fails
-      await supabase
-        .from('documents')
-        .delete()
-        .eq('id', document.id);
-        
-      return NextResponse.json(
-        { error: 'Failed to store document chunks' },
-        { status: 500 }
-      );
-    }
-    
+    // Return the document ID
     return NextResponse.json({
-      success: true,
-      documentId: document.id,
-      chunkCount: body.chunks.length
-    }, { status: 201 });
+      documentId: documentData.id,
+      message: 'Document uploaded successfully'
+    });
     
   } catch (error) {
     console.error('Error uploading document:', error);
     return NextResponse.json(
-      { error: 'Failed to process document upload' },
+      { error: 'Failed to upload document' },
       { status: 500 }
     );
   }
@@ -138,7 +152,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
-    const projectId = params.id;
+    const { id: projectId } = await params;
     
     // Initialize Supabase client with cookies
     const supabase = await createClient();

@@ -28,12 +28,7 @@ Functions like encryptText, encryptMetadata, and encryptVector can be used outsi
 Each function checks if the service is initialized and initializes it if needed
 
 3. Created PDF Processing Utilities: (c:\Projects\Confidential-Copilot\src\lib\pdfUtils.ts)
-PDF Validation: validatePdfFile: Checks if a file is a PDF and within the 5MB size limit
-Text Extraction: extractTextFromPdf: Extracts text and metadata from a PDF file using PDFLoader
-Chunking: chunkText: Splits text into chunks with configurable size and overlap
-Complete Processing Pipeline: processPdfFile: An end-to-end function that validates, extracts, and chunks a PDF file
-
-The utilities are designed to work client-side, which aligns with zero-trust and client-side processing requirements. PDF extraction is performed entirely in the browser without sending the file to any server.
+This file, pdfUtils.ts, provides utilities for processing PDF files. It includes functions to `validatePdfFile` by checking its type and size, `extractTextFromPdf` to extract text and metadata, `chunkText` to divide the extracted text into smaller chunks, and `processPdfFile` to perform the complete PDF processing pipeline. It also defines interfaces `PDFExtractionResult` and `DocumentChunk` to structure the extracted data and chunks. Constants like `MAX_FILE_SIZE`, `DEFAULT_CHUNK_SIZE`, and `DEFAULT_CHUNK_OVERLAP` define limits and default values for file processing.
 
 4. Vector Embedding Utilities Implementation (c:\Projects\Confidential-Copilot\src\lib\embeddingUtils.ts)
 
@@ -106,8 +101,92 @@ Error Handling:
 - Comprehensive error handling at each stage
 - Proper error reporting to both the client and the progress tracking system
 
+
+
+
+
 ## FRONTEND
 
 1. Dashboard Page Implementation
 (a) Dashboard Page Component: Confidential-Copilot\src\app\dashboard\page.tsx
+This code defines the `DashboardPage` component in page.tsx, which fetches and displays a list of projects. It uses React hooks like `useState` and `useEffect` to manage the component's state, including the list of `projects`, loading state (`isLoading`), error messages (`error`), and modal visibility (`isModalOpen`). The `fetchProjects` function fetches project data from the `/api/projects` endpoint and updates the `projects` state. The component also includes functions to handle project creation (`handleCreateProject`) and deletion (`handleDeleteProject`). It renders a `ProjectList` component to display the projects, a `CreateProjectModal` for creating new projects, and an `EmptyState` component when there are no projects. The projects can be sorted and filtered using the search bar and sort buttons.
+
+(b) Project Types Definition: Confidential-Copilot\src\types\project.ts
+The code defines a TypeScript interface named `Project`. This interface is a type declaration that outlines the structure of a project object. It specifies that a `Project` object will have the following properties: `id` (a string), `name` (a string), an optional `description` (a string or undefined), `created_at` (a string), and `user_id` (a string). 
+
+(c) Project Card Component: Confidential-Copilot\src\components\dashboard\ProjectCard.tsx
+ProjectCard.tsx is a React component in a Next.js application that displays project information. It receives a `project` object and a `onDelete` function as props. The component shows the project's name, creation date, and description. It includes a delete button that, when clicked, opens a confirmation popup. The `handleDelete` function is called upon confirmation, which calls the `onDelete` prop function to delete the project. The card navigates to the project's detail page when clicked, handled by the `handleCardClick` function.
+
+(d) Project List Component: Confidential-Copilot\src\components\dashboard\ProjectList.tsx
+`ProjectList` is a React component that renders a grid of `ProjectCard` components, each displaying project information and providing a delete button, using data passed in the `projects` prop and calling the `onDeleteProject` prop function when a project is deleted.
+
+(e) Create Project Modal Component: Confidential-Copilot\src\components\dashboard\CreateProjectModal.tsx
+The code defines a `CreateProjectModal` React component, which presents a modal dialog for creating new projects. It includes state management for the project's `name` and `description`, handles form submission via the `handleSubmit` function, displays errors, and communicates with a parent component through the `onCreateProject` prop to create the project.
+
+(f) Empty State Component:
+Confidential-Copilot\src\components\dashboard\EmptyState.tsx
+The `EmptyState` component in EmptyState.tsx renders a UI element displayed when the user has no projects, prompting them to create one using the `onCreateProject` function.
+
+2. Project Page Implementation
+(a) Project Page Component: Confidential-Copilot\src\app\projects\[id]\page.tsx
+The `ProjectPage` component fetches and displays project details and documents. It uses `fetchProjectData` to retrieve data, handles document uploads with `handleUploadComplete`, and manages document deletion with `handleDeleteDocument`. It also decrypts document names using the `encryptionService` when available.
+
+(b) Document Type Definition: Confidential-Copilot\src\types\document.ts
+The code defines a TypeScript interface `Document` representing a document's structure, including fields like `id`, `project_id`, `name`, `type`, `upload_date`, `file_size`, `page_count`, and `encrypted_metadata`.
+
+(c) Project Header Component: Confidential-Copilot\src\components\projects\ProjectHeader.tsx
+The `ProjectHeader` component displays project information (name, description, creation date) and an upload button. It allows users to edit the project's name and description using a form that calls the `handleSubmit` function to send updates to the server via a PATCH request to `/api/projects/${project.id}`. The component uses state variables (`isEditing`, `name`, `description`, `isSubmitting`, `error`) to manage the editing state and form inputs. The `onUploadClick` prop is a callback function triggered when the "Upload Document" button is clicked.
+
+(d) Document List Component: Confidential-Copilot\src\components\documents\DocumentList.tsx
+`DocumentList` component displays, filters, and sorts a list of documents with search and sort functionalities, rendering each document as a `DocumentCard`.
+
+(e) Document Card Component: Confidential-Copilot\src\components\documents\DocumentCard.tsx
+*   DocumentCard.tsx: This React component displays document details like name, upload date, type, and size, and includes a delete confirmation feature.
+*   `formatFileSize`: This function converts a file size in bytes to a human-readable format (bytes, KB, or MB).
+
+
+3. File Upload Components Implementation
+(a) FileUploader Component: Confidential-Copilot\src\components\uploads\FileUploader.tsx
+This code defines a `FileUploader` component in `src/components/uploads/FileUploader.tsx` that allows users to upload files, specifically PDFs. It handles file validation (type and size), drag-and-drop functionality, displays upload progress, and shows error messages. The component uses React hooks like `useState`, `useRef`, and `useCallback` to manage its state and behavior. It also provides options for canceling the upload and displaying the selected file's information.
+
+(b) Progress Bar Component: 
+Confidential-Copilot\src\components\uploads\ProgressBar.tsx
+This React functional component, `ProgressBar`, renders a customizable progress bar with optional percentage text, ensuring the progress value stays between 0-100, and allows styling via props for color, height, and visibility of the percentage.
+
+(c) Error Display Component:
+Confidential-Copilot\src\components\uploads\ErrorDisplay.tsx
+This React functional component, `ErrorDisplay`, takes an error message and an optional CSS class as props, and conditionally renders a styled error alert box with an icon if the error message exists.
+
+(d) PDF File Preview Component: Confidential-Copilot\src\components\uploads\PDFPreview.tsx
+This React component, `PDFPreview`, generates a preview of a PDF file using a blob URL, displays it in an `<object>` element, and provides a fallback message with a link if the preview fails, while cleaning up the blob URL on unmount.
+
+(e) Document Uploader Component: Confidential-Copilot\src\components\documents\DocumentUploader.tsx
+DocumentUploader.tsx is a React component that handles the uploading and processing of documents, specifically PDFs, in a secure manner. It uses several custom hooks and components to achieve this: `useEncryptionService` for encryption, `useDocumentProcessor` for handling the file processing pipeline, `FileUploader` for the drag-and-drop file selection, and `PDFPreview` for displaying a preview of the selected PDF. The component manages the file selection via `handleFileSelect`, initiates the upload process with `startUpload` which calls `processFile` from the `useDocumentProcessor` hook, and allows canceling the upload via `handleCancelUpload`. It also displays progress and status updates during the upload and processing stages, ensuring a secure, client-side processing workflow.
+
+
+## Client-Side Processing 
+
+8. Client-Side Processing Implementation
+(a) Create Enhanced Client-Side Processing Configuration File: Confidential-Copilot\src\lib\processingConfig.ts
+This code defines a configuration interface `PDFProcessingConfig` for PDF processing, provides a default configuration, and a function to override the default configuration with user-provided values.
+
+(b) Create a Comprehensive Client-Side Processing Module: Confidential-Copilot\src\lib\clientProcessing.ts
+The `processDocument` function orchestrates a client-side document processing pipeline: It validates and extracts data from a PDF using `validatePdfFile` and `processPdfFile`, generates embeddings using `generateBatchEmbeddings`, encrypts the content and metadata using `encryptText`, `encryptMetadata`, and `encryptVector` from `dcpe-js`, reports progress using `initiateProcessingJob`, `updateProcessingProgress`, and uploads the encrypted data to a server endpoint. It handles errors and cancellations, and returns a `ProcessingResult` indicating success or failure.
+
+(c) Create a Custom Hook for Client-Side Processing: Confidential-Copilot\src\hooks\useDocumentProcessor.ts
+The `useDocumentProcessor` hook manages the document processing workflow. It uses `useState` to track the processing status, progress, errors, and `symmetricKey` from `useAuthStore`. The `processFile` function is the core logic, taking a `projectId` and a `File` object as input. It calls `processDocument` to handle the actual processing, which includes validation, text extraction using `processPdfFile`, embedding generation using `generateBatchEmbeddings`, encryption, and uploading to the server. Throughout the process, `reportProgress` updates the UI, and error handling ensures that failures are caught and reported.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

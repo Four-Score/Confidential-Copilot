@@ -24,7 +24,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
-    const projectId = params.id;
+    const { id: projectId } = await params;
     
     // Initialize Supabase client with cookies
     const supabase = await createClient();
@@ -64,7 +64,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
-    const projectId = params.id;
+    const { id: projectId } = await params;
     
     // Initialize Supabase client with cookies
     const supabase = await createClient();
@@ -152,7 +152,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
-    const projectId = params.id;
+    const { id: projectId } = await params;
     
     // Initialize Supabase client with cookies
     const supabase = await createClient();
