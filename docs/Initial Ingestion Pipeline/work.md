@@ -1,4 +1,6 @@
-SUMMARY OF WHAT HAS BEEN DONE UP TILL NOW FOR THE Ingestion Pipeline PLAN
+# SUMMARY OF WHAT HAS BEEN DONE UP TILL NOW FOR THE Ingestion Pipeline PLAN
+
+## BACKEND
 
 1. created tables for projects, data and vector_chunks of the data
 
@@ -70,4 +72,42 @@ This code defines two API endpoints for handling document-specific operations in
 (d) Document Upload Progress API Route: Confidential-Copilot\src\app\api\documents\progress\route.ts
 This code defines an API route (`route.ts`) in a Next.js application for tracking the progress of document uploads. It uses Supabase for authentication and stores progress information in an in-memory object `progressStore`. The `POST` method updates the progress, status, and any error messages associated with a given `uploadId`. The `GET` method retrieves the progress data for a specific `uploadId`. The `cleanupOldEntries` function periodically removes old entries from the `progressStore` to prevent memory leaks. The `createClient` function initializes a Supabase client with cookie handling for server-side operations, ensuring that user sessions are maintained. The Supabase client is then used to call `getSession` to ensure the user is authenticated.
 
+7. Processing Pipeline API Implementation
+(a) Processing Start API Endpoint: Confidential-Copilot\src\app\api\processing\start\route.ts
+This code defines an API endpoint (`POST` in route.ts) in a Next.js application to initiate document processing. It uses Supabase for authentication and database interactions. The `POST` function first checks if the user is authenticated using `supabase.auth.getSession()`. If authenticated, it parses the request body to extract `projectId` and `fileName`, validates their presence, and verifies that the project exists and belongs to the user by querying the `projects` table. A unique `jobId` is generated, and the function returns this `jobId` along with a status message to the client. Error handling is included to return appropriate HTTP status codes for authentication failures, missing parameters, project not found, and other server errors.
+
+(b) Processing Status API Endpoint: Confidential-Copilot\src\app\api\processing\status\[jobId]\route.ts
+This code defines a `GET` function in route.ts that serves as an API endpoint to check the status of a document processing job, identified by `jobId`. It initializes a Supabase client, verifies user authentication via `supabase.auth.getSession()`, and then makes an internal `fetch` request to the `/api/documents/progress` endpoint, passing the `jobId` as an `uploadId` parameter. If the internal request is successful, it returns the status data as a JSON response; otherwise, it returns an error. Error handling is included to catch any exceptions during the process.
+
+(c) Processing Cancel API Endpoint: Confidential-Copilot\src\app\api\processing\cancel\[jobId]\route.ts
+This code defines a Next.js API endpoint (`POST` at `/api/documents/cancel/[jobId]`) to cancel a document processing job. It extracts the `jobId` from the URL parameters, initializes a Supabase client using `createClient()`, and verifies user authentication via `supabase.auth.getSession()`. Upon successful authentication, it sends a `POST` request to `/api/documents/progress` to update the job's status to 'cancelled'. The function returns a JSON response indicating success or failure, along with appropriate HTTP status codes. Error handling is included to catch and log any exceptions during the cancellation process.
+
+(d) Create a Client-Side Processing Utility: Confidential-Copilot\src\lib\processingUtils.ts
+This code defines a client-side document processing pipeline in processingUtils.ts for a React/TypeScript application. It includes functions to handle PDF processing, embedding generation, encryption, and interaction with a backend API. The `processPdfDocument` function orchestrates the entire process: it extracts text from a PDF using `processPdfFile`, generates embeddings using `generateBatchEmbeddings`, encrypts the data using functions from `encryptionUtils` (like `encryptText`, `encryptMetadata`, and `encryptVector`), and uploads the encrypted data to the server. Helper functions like `initiateProcessingJob`, `updateProcessingProgress`, and `cancelProcessingJob` manage the communication with the backend to track and control the processing job. The code also defines types and interfaces such as `ProcessingStatus`, `ProcessingProgressEvent`, and `ProcessingOptions` to manage the state and configuration of the document processing pipeline.
+Implementation Notes:
+Zero-Trust Processing Model:
+- All document processing happens client-side
+- PDF extraction, chunking, embedding generation, and encryption all happen in the - rowser
+- Server only coordinates and stores the encrypted results
+- This maintains the security-by-design principle
+API Endpoints:
+- `/api/processing/start`: Initiates a processing job
+- `/api/processing/status/[jobId]`: Checks the status of a processing job
+- `/api/processing/cancel/[jobId]`: Cancels a processing job
+Client-Side Processing Utility:
+- `processingUtils.ts`: Coordinates the complete document processing workflow
+- Handles step-by-step processing with progress tracking
+- Provides cancellation support for long-running operations
+Progress Tracking:
+- Reuses the existing progress tracking system
+- Provides detailed status updates for each processing phase
+- Allows for progress visualization in the UI
+Error Handling:
+- Comprehensive error handling at each stage
+- Proper error reporting to both the client and the progress tracking system
+
+## FRONTEND
+
+1. Dashboard Page Implementation
+(a) Dashboard Page Component: Confidential-Copilot\src\app\dashboard\page.tsx
 
