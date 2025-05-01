@@ -31,7 +31,7 @@ We use three main tables in Supabase:
 
 ### 1. Upload Process
 
-1. User navigates to a project page (`c:\Projects\Confidential-Copilot\src\app\projects\[id]\page.tsx`)
+1. User navigates to a project page (`Confidential-Copilot\src\app\projects\[id]\page.tsx`)
 2. User triggers document upload via the `DocumentUploader` component
 3. `FileUploader` component handles file selection and validation
 4. `startUpload()` in `DocumentUploader` initiates processing
@@ -82,7 +82,7 @@ To add support for a new data type, you'll need to:
 Create a new module similar to pdfUtils.ts that handles:
 
 ```typescript
-// Example path: c:\Projects\Confidential-Copilot\src\lib\[dataType]Utils.ts
+// Example path: Confidential-Copilot\src\lib\[dataType]Utils.ts
 
 // Functions to implement:
 - validateFile/validateData
@@ -96,7 +96,7 @@ Create a new module similar to pdfUtils.ts that handles:
 Extend the `DocumentUploader` component to recognize and handle your new data type:
 
 ```typescript
-// c:\Projects\Confidential-Copilot\src\components\documents\DocumentUploader.tsx
+// Confidential-Copilot\src\components\documents\DocumentUploader.tsx
 // Add support for new file types or data inputs
 ```
 
@@ -105,7 +105,7 @@ Extend the `DocumentUploader` component to recognize and handle your new data ty
 Modify clientProcessing.ts to handle your data type, or create a specialized version:
 
 ```typescript
-// c:\Projects\Confidential-Copilot\src\lib\clientProcessing.ts
+// Confidential-Copilot\src\lib\clientProcessing.ts
 // Either extend processDocument or create a new function like processEmailData
 ```
 
