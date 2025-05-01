@@ -101,3 +101,86 @@ export async function GET(
     );
   }
 }
+
+/**
+ * Deletes a document within a project context
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string, documentId: string } }
+): Promise<NextResponse> {
+  try {
+    const { id: projectId, documentId } = await params;
+    
+    // Initialize Supabase client
+    const supabase = await createClient();
+    
+    // Check if user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+    
+    // Verify project ownership
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('id, user_id')
+      .eq('id', projectId)
+      .single();
+      
+    if (projectError || !project) {
+      return NextResponse.json(
+        { error: 'Project not found' },
+        { status: 404 }
+      );
+    }
+    
+    if (project.user_id !== user.id) {
+      return NextResponse.json(
+        { error: 'Access denied' },
+        { status: 403 }
+      );
+    }
+    
+    // Verify document exists and belongs to the project
+    const { data: document, error: documentError } = await supabase
+      .from('documents')
+      .select('id, project_id')
+      .eq('id', documentId)
+      .eq('project_id', projectId)
+      .single();
+      
+    if (documentError || !document) {
+      return NextResponse.json(
+        { error: 'Document not found or does not belong to this project' },
+        { status: 404 }
+      );
+    }
+    
+    // Delete the document (chunks will be deleted via CASCADE)
+    const { error: deleteError } = await supabase
+      .from('documents')
+      .delete()
+      .eq('id', documentId);
+      
+    if (deleteError) {
+      console.error('Error deleting document:', deleteError);
+      return NextResponse.json(
+        { error: 'Failed to delete document' },
+        { status: 500 }
+      );
+    }
+    
+    return NextResponse.json({ success: true });
+    
+  } catch (error) {
+    console.error('Error deleting document:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete document' },
+      { status: 500 }
+    );
+  }
+}
