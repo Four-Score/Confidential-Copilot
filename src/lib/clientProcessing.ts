@@ -71,7 +71,7 @@ export async function processDocument(
   
   try {
     // Initial validation
-    const validationResult = validatePdfFile(file, config.maxFileSize);
+    const validationResult = validatePdfFile(file);
     if (!validationResult.valid) {
       throw new Error(validationResult.error || 'Invalid file');
     }
@@ -113,15 +113,17 @@ export async function processDocument(
     // STEP 1: Extract text and metadata from PDF
     await reportProgress('extracting', 5, 'Extracting text from PDF');
     
-    let extraction: PDFExtractionResult;
+    let extractionResult;
     try {
-      extraction = await processPdfFile(file, {
-        chunkSize: config.chunkSize,
-        chunkOverlap: config.chunkOverlap
-      });
+      extractionResult = await processPdfFile(
+        file, 
+        jobId, // Pass the jobId as documentId
+        config.chunkSize,
+        config.chunkOverlap
+      );
       
-      if (!extraction.valid || !extraction.chunks || !extraction.metadata) {
-        throw new Error(extraction.error || 'Failed to process PDF');
+      if (!extractionResult.valid || !extractionResult.chunks || !extractionResult.metadata) {
+        throw new Error(extractionResult.error || 'Failed to process PDF');
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'PDF extraction failed';
@@ -130,10 +132,10 @@ export async function processDocument(
     }
     
     if (config.debug) {
-      console.log('Extracted chunks:', extraction.chunks.length);
+      console.log('Extracted chunks:', extractionResult.chunks.length);
     }
     
-    await reportProgress('chunking', 25, `Created ${extraction.chunks.length} text chunks`);
+    await reportProgress('chunking', 25, `Created ${extractionResult.chunks.length} text chunks`);
     
     // Check for cancellation after extraction
     if (abortSignal?.aborted) {
@@ -142,12 +144,10 @@ export async function processDocument(
     }
     
     // STEP 2: Generate embeddings
-    await reportProgress('embedding', 30, 'Generating vector embeddings');
-    
     let embeddingsWithProgress: ChunkWithEmbedding[];
     try {
       embeddingsWithProgress = await generateBatchEmbeddings(
-        extraction.chunks,
+        extractionResult.chunks,
         config.embeddingBatchSize,
         (embeddingProgress) => {
           const overallProgress = 30 + (embeddingProgress * 0.3);
@@ -175,15 +175,13 @@ export async function processDocument(
     }
     
     // STEP 3: Encrypt content and metadata
-    await reportProgress('encrypting', 65, 'Encrypting document contents and metadata');
-    
     // Prepare metadata
     const metadataObj = {
       originalName: file.name,
-      pageCount: extraction.metadata.pageCount || 1,
+      pageCount: extractionResult.metadata.pageCount || 1,
       created: new Date().toISOString(),
       fileType: file.type,
-      chunkCount: extraction.chunks.length
+      chunkCount: extractionResult.chunks.length
     };
     
     // Encrypt document name and metadata
@@ -197,22 +195,19 @@ export async function processDocument(
     };
     
     // Encrypt full document content
-    const fullText = extraction.chunks.map(chunk => chunk.content).join(' ');
+    const fullText = extractionResult.chunks.map((chunk) => chunk.content).join(' ');
     const encryptedContent = await encryptText(fullText, symmetricKey);
     
     // Encrypt chunks and embeddings
-    const encryptedChunks = await Promise.all(embeddingsWithProgress.map(async (item, index) => {
+    const encryptedChunks = await Promise.all(embeddingsWithProgress.map(async (item: ChunkWithEmbedding, index: number) => {
       // Report progress for large documents
-      if (index % 10 === 0) {
-        const chunkProgress = 65 + ((index / embeddingsWithProgress.length) * 20);
-        await reportProgress(
-          'encrypting',
-          chunkProgress,
-          `Encrypting chunk ${index + 1}/${embeddingsWithProgress.length}`
-        );
-      }
+      const chunkProgress = 65 + ((index / embeddingsWithProgress.length) * 20);
+      await reportProgress(
+        'encrypting',
+        chunkProgress,
+        `Encrypting chunk ${index + 1}/${embeddingsWithProgress.length}`
+      );
       
-      // Check for cancellation during long operations
       if (abortSignal?.aborted) {
         throw new Error('Operation cancelled by user');
       }
