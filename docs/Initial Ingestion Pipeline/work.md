@@ -146,27 +146,31 @@ Error Handling:
 
 ## FRONTEND
 
-1. Dashboard Page Implementation
-(a) Dashboard Page Component: Confidential-Copilot\src\app\dashboard\page.tsx
-This code defines the `DashboardPage` component in page.tsx, which fetches and displays a list of projects. It uses React hooks like `useState` and `useEffect` to manage the component's state, including the list of `projects`, loading state (`isLoading`), error messages (`error`), and modal visibility (`isModalOpen`). The `fetchProjects` function fetches project data from the `/api/projects` endpoint and updates the `projects` state. The component also includes functions to handle project creation (`handleCreateProject`) and deletion (`handleDeleteProject`). It renders a `ProjectList` component to display the projects, a `CreateProjectModal` for creating new projects, and an `EmptyState` component when there are no projects. The projects can be sorted and filtered using the search bar and sort buttons.
+1. Projects Page Implementation
+(a) Projects Page Component: Confidential-Copilot\src\app\projects\page.tsx
+This code defines the `ProjectsPage` component in page.tsx, which fetches and displays a list of projects. It uses React hooks like `useState` and `useEffect` to manage the component's state, including the list of `projects`, loading state (`isLoading`), error messages (`error`), and modal visibility (`isModalOpen`). The `fetchProjects` function fetches project data from the `/api/projects` endpoint and updates the `projects` state. The component also includes functions to handle project creation (`handleCreateProject`) and deletion (`handleDeleteProject`). It renders a `ProjectList` component to display the projects, a `CreateProjectModal` for creating new projects, and an `EmptyState` component when there are no projects. The projects can be sorted and filtered using the search bar and sort buttons.
 
 (b) Project Types Definition: Confidential-Copilot\src\types\project.ts
 The code defines a TypeScript interface named `Project`. This interface is a type declaration that outlines the structure of a project object. It specifies that a `Project` object will have the following properties: `id` (a string), `name` (a string), an optional `description` (a string or undefined), `created_at` (a string), and `user_id` (a string). 
 
-(c) Project Card Component: Confidential-Copilot\src\components\dashboard\ProjectCard.tsx
-ProjectCard.tsx is a React component in a Next.js application that displays project information. It receives a `project` object and a `onDelete` function as props. The component shows the project's name, creation date, and description. It includes a delete button that, when clicked, opens a confirmation popup. The `handleDelete` function is called upon confirmation, which calls the `onDelete` prop function to delete the project. The card navigates to the project's detail page when clicked, handled by the `handleCardClick` function.
+(c) Project Card Component: Confidential-Copilot\src\components\projects\ProjectCard.tsx
+ProjectCard.tsx is a React component in a Next.js application that displays project information. It receives a `project` object and a `onDelete` function as props. The component shows the project's name, creation date, and description. It includes a delete button that, when clicked, opens a confirmation popup. The `handleDelete` function is called upon confirmation, which calls the `onDelete` prop function to delete the project. The card navigates to the project's detail page when clicked.
 
-(d) Project List Component: Confidential-Copilot\src\components\dashboard\ProjectList.tsx
+(d) Project List Component: Confidential-Copilot\src\components\projects\ProjectList.tsx
 `ProjectList` is a React component that renders a grid of `ProjectCard` components, each displaying project information and providing a delete button, using data passed in the `projects` prop and calling the `onDeleteProject` prop function when a project is deleted.
 
-(e) Create Project Modal Component: Confidential-Copilot\src\components\dashboard\CreateProjectModal.tsx
+(e) Create Project Modal Component: Confidential-Copilot\src\components\projects\CreateProjectModal.tsx
 The code defines a `CreateProjectModal` React component, which presents a modal dialog for creating new projects. It includes state management for the project's `name` and `description`, handles form submission via the `handleSubmit` function, displays errors, and communicates with a parent component through the `onCreateProject` prop to create the project.
 
 (f) Empty State Component:
-Confidential-Copilot\src\components\dashboard\EmptyState.tsx
+Confidential-Copilot\src\components\projects\EmptyState.tsx
 The `EmptyState` component in EmptyState.tsx renders a UI element displayed when the user has no projects, prompting them to create one using the `onCreateProject` function.
 
-2. Project Page Implementation
+2. Dashboard Page Implementation
+(a) Dashboard Page Component: Confidential-Copilot\src\app\dashboard\page.tsx
+The `DashboardPage` component now serves as the main landing page for authenticated users. It provides a sidebar navigation to various features including Projects, Meeting Summarizer, and other application modes. The dashboard displays summary cards and recently used items, and includes features for data ingestion. The sidebar can be toggled for better space utilization, and the component includes navigation functions to direct users to specific features like the Projects page.
+
+3. Project Page Implementation
 (a) Project Page Component: Confidential-Copilot\src\app\projects\[id]\page.tsx
 The `ProjectPage` component fetches and displays project details and documents. It uses `fetchProjectData` to retrieve data, handles document uploads with `handleUploadComplete`, and manages document deletion with `handleDeleteDocument`. It also decrypts document names using the `encryptionService` when available. The component has been updated to correctly handle the API response structure for project data.
 

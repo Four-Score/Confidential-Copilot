@@ -1,11 +1,9 @@
-'use client';
-
 import { useState } from 'react';
 
 interface CreateProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreateProject: (data: { name: string; description?: string }) => Promise<{ error?: string } | undefined>;
+  onCreateProject: (projectData: { name: string; description?: string }) => Promise<{ error: string } | undefined>;
 }
 
 export default function CreateProjectModal({ isOpen, onClose, onCreateProject }: CreateProjectModalProps) {
@@ -13,13 +11,10 @@ export default function CreateProjectModal({ isOpen, onClose, onCreateProject }:
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  if (!isOpen) return null;
-
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (isSubmitting) return;
     if (!name.trim()) {
       setError('Project name is required');
       return;
@@ -37,31 +32,37 @@ export default function CreateProjectModal({ isOpen, onClose, onCreateProject }:
       if (result?.error) {
         setError(result.error);
       } else {
-        // Reset form if successful
+        // Reset form on success
         setName('');
         setDescription('');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      setError('An unexpected error occurred');
+      console.error(err);
     } finally {
       setIsSubmitting(false);
     }
   };
-
+  
+  if (!isOpen) return null;
+  
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div 
-        className="bg-white rounded-lg shadow-xl w-full max-w-md"
-        onClick={(e) => e.stopPropagation()}  
-      >
-        <div className="flex justify-between items-center border-b px-6 py-4">
-          <h3 className="text-xl font-semibold text-gray-900">Create New Project</h3>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg w-full max-w-md overflow-hidden">
+        <div className="flex justify-between items-center p-4 border-b">
+          <h2 className="text-xl font-semibold text-gray-800">Create New Project</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-gray-400 hover:text-gray-600 transition duration-200"
             aria-label="Close"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -91,19 +92,19 @@ export default function CreateProjectModal({ isOpen, onClose, onCreateProject }:
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="Enter project description"
-            ></textarea>
+              rows={3}
+            />
           </div>
           
           {error && (
-            <div className="mb-4 bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-              <span className="block sm:inline">{error}</span>
+            <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md text-sm" role="alert">
+              {error}
             </div>
           )}
           
-          <div className="flex justify-end gap-3 mt-6">
+          <div className="flex justify-end gap-3">
             <button
               type="button"
               onClick={onClose}
