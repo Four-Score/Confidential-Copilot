@@ -175,51 +175,43 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     initializeAuth: async () => {
         set({ isLoading: true });
         const supabase = createClient(); // Browser client
-        const { data: { session }, error } = await supabase.auth.getSession();
 
-        if (error) {
-            console.error("Error fetching initial session:", error);
-            set({ user: null, session: null, isLoading: false, error: "Failed to initialize session." });
-            return;
-        }
+        try {
+            // First check if we have a user from the direct authentication request
+            const { data: { user }, error } = await supabase.auth.getUser();
 
-        if (session) {
-             console.log("Initial session found:", session);
-            // If there's a session, we have the user, but NOT the key yet.
-            // Key needs to be decrypted on login or recovery.
-            set({ user: session.user, session, isLoading: false });
-        } else {
-             console.log("No initial session found.");
-            set({ user: null, session: null, isLoading: false });
-        }
-
-        /**
-         * Listens for authentication state changes (login, logout, token refresh).
-         * Updates the store's state accordingly.
-         */
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            (_event, session) => {
-                console.log("Auth state changed:", _event, session);
-                const currentState = get();
-                // Update user/session state
-                set({ user: session?.user ?? null, session });
-
-                // IMPORTANT: Clear the decrypted key if the user logs out or session becomes invalid
-                if (_event === 'SIGNED_OUT' || !session) {
-                    if (currentState.decryptedSymmetricKey) {
-                        currentState.setDecryptedKey(null);
-                    }
-                }
-                // Note: Key is NOT automatically decrypted on SIGNED_IN or TOKEN_REFRESHED
-                // It requires explicit user action (login/recovery) involving the password/recovery key.
+            if (error) {
+                console.error("Error fetching auth user:", error);
+                set({ user: null, session: null, isLoading: false, error: "Failed to initialize session." });
+                return;
             }
-        );
 
-        // Return cleanup function for the listener
-        // This is often handled by framework integration, but good practice
-        // return () => {
-        //     subscription?.unsubscribe();
-        // };
+            if (user) {
+                set({ user, session: null, isLoading: false });
+                console.log("User found:", user);
+
+                // Get user security key if it exists
+                const { data: userKeyData, error: userKeyError } = await supabase
+                    .from('user_keys')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .maybeSingle();
+
+                if (userKeyError) {
+                    console.error("Error fetching user key:", userKeyError);
+                } else if (userKeyData) {
+                    console.log("User key data found:", userKeyData);
+                } else {
+                    console.log("No user key data found.");
+                }
+            } else {
+                set({ user: null, session: null, isLoading: false });
+                console.log("No user found.");
+            }
+        } catch (error) {
+            console.error("Error initializing auth:", error);
+            set({ user: null, session: null, isLoading: false, error: "Failed to initialize session." });
+        }
     },
 
    

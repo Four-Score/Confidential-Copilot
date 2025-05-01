@@ -1,0 +1,81 @@
+-- Create a transaction-safe function to insert a document with its chunks
+CREATE OR REPLACE FUNCTION public.insert_document_with_chunks(
+  p_project_id UUID,
+  p_name TEXT,
+  p_original_name TEXT,
+  p_type TEXT,
+  p_file_size INTEGER,
+  p_page_count INTEGER,
+  p_encrypted_content TEXT,
+  p_encrypted_metadata JSONB,
+  p_chunks JSONB
+) RETURNS JSONB 
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_document_id UUID;
+  v_chunk JSONB;
+  v_result JSONB;
+BEGIN
+  -- Start a transaction
+  BEGIN
+    -- Insert document
+    INSERT INTO public.documents (
+      project_id, 
+      name, 
+      type,
+      file_size,
+      page_count,
+      encrypted_content,
+      encrypted_metadata
+    ) VALUES (
+      p_project_id,
+      p_name,
+      p_type::document_type,
+      p_file_size,
+      p_page_count,
+      p_encrypted_content,
+      p_encrypted_metadata
+    )
+    RETURNING id INTO v_document_id;
+    
+    -- Insert chunks
+    FOR v_chunk IN SELECT * FROM jsonb_array_elements(p_chunks)
+    LOOP
+      INSERT INTO public.vector_chunks (
+        document_id,
+        chunk_number,
+        encrypted_chunk_content,
+        encrypted_embeddings,
+        metadata
+      ) VALUES (
+        v_document_id,
+        (v_chunk->>'chunkNumber')::INTEGER,
+        v_chunk->>'encryptedContent',
+        (v_chunk->>'encryptedEmbeddings')::vector,
+        CASE 
+          WHEN v_chunk->'metadata' IS NOT NULL THEN v_chunk->'metadata' 
+          ELSE '{}'::jsonb 
+        END
+      );
+    END LOOP;
+    
+    -- If we get here, everything succeeded
+    v_result := jsonb_build_object(
+      'success', true,
+      'id', v_document_id
+    );
+    
+    -- Commit transaction happens automatically if we reach the end without errors
+    
+    RETURN v_result;
+  EXCEPTION WHEN OTHERS THEN
+    -- An error occurred, rollback the transaction
+    RAISE EXCEPTION 'Transaction failed: %', SQLERRM;
+  END;
+END;
+$$;
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION public.insert_document_with_chunks TO authenticated;

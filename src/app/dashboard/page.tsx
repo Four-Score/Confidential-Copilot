@@ -15,6 +15,11 @@ export default function DashboardPage() {
         router.push('/dashboard/meeting-summarizer');
     };
 
+    // Navigate to projects page
+    const navigateToProjects = () => {
+        router.push('/projects');
+    };
+
     return (
         <div className="min-h-screen flex flex-col bg-gray-50">
             {/* Header */}
@@ -76,6 +81,18 @@ export default function DashboardPage() {
                                 <span className="text-xs mt-1">COMPONENTS</span>
                             </div>
 
+                            {/* Projects Icon */}
+                            <div className="flex flex-col items-center">
+                                <div
+                                    onClick={navigateToProjects}
+                                    className="text-xl cursor-pointer hover:text-blue-600 transition-colors"
+                                    title="My Projects"
+                                >
+                                    📁
+                                </div>
+                                <span className="text-xs mt-1">Projects</span>
+                            </div>
+
                             {/* Meeting Summarizer Icon - Second Position */}
                             <div className="flex flex-col items-center">
                                 <div
@@ -117,8 +134,11 @@ export default function DashboardPage() {
                 <main className={`flex-1 p-4 ${!isSidebarOpen ? 'ml-10' : ''}`}>
                     {/* Top Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                        <div className="bg-white p-4 rounded-md shadow-sm border border-gray-100">
-                            <h2 className="font-bold text-sm">PROJECTS</h2>
+                        <div 
+                            onClick={navigateToProjects}
+                            className="bg-white p-4 rounded-md shadow-sm border border-gray-100 hover:shadow-md cursor-pointer transition-all duration-200"
+                        >
+                            <h2 className="font-bold text-sm text-blue-700">PROJECTS</h2>
                             <p className="text-xs text-gray-500">Since last month</p>
                         </div>
                         <div className="bg-white p-4 rounded-md shadow-sm border border-gray-100">

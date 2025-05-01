@@ -1,0 +1,63 @@
+-- Create enum type for document types
+CREATE TYPE document_type AS ENUM ('pdf', 'link', 'video');
+
+-- Create documents table with specified fields
+CREATE TABLE public.documents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  name TEXT NOT NULL, -- Will store deterministically encrypted name
+  type document_type NOT NULL,
+  upload_date TIMESTAMPTZ NOT NULL DEFAULT now(),
+  encrypted_content TEXT, -- Will store standard encrypted content
+  encrypted_metadata JSONB, -- Will store deterministically encrypted metadata
+  file_size INTEGER, -- Size in bytes
+  page_count INTEGER, -- For PDFs
+  
+  
+  -- For more efficient lookups by project
+  CONSTRAINT fk_project FOREIGN KEY (project_id) 
+    REFERENCES public.projects(id) ON DELETE CASCADE
+);
+
+-- Add index on project_id to optimize queries filtering by project
+CREATE INDEX idx_documents_project_id ON public.documents(project_id);
+
+-- Enable Row Level Security
+ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies
+-- Users can only access documents belonging to their projects
+CREATE POLICY "Users can select their own documents" 
+  ON public.documents FOR SELECT 
+  USING (
+    project_id IN (
+      SELECT id FROM public.projects WHERE user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can insert documents into their projects" 
+  ON public.documents FOR INSERT 
+  WITH CHECK (
+    project_id IN (
+      SELECT id FROM public.projects WHERE user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can update their own documents" 
+  ON public.documents FOR UPDATE 
+  USING (
+    project_id IN (
+      SELECT id FROM public.projects WHERE user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can delete their own documents" 
+  ON public.documents FOR DELETE 
+  USING (
+    project_id IN (
+      SELECT id FROM public.projects WHERE user_id = auth.uid()
+    )
+  );
+
+-- Grant access to authenticated users
+GRANT ALL ON public.documents TO authenticated;

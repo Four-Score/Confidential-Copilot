@@ -5,7 +5,7 @@ module.exports = {
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/**/*.{js,ts,jsx,tsx,mdx}",
   ],
-  darkMode: false, // or 'media' or 'class'
+  darkMode: 'class', // Changed from false to 'class' for explicit control
   theme: {
     extend: {},
   },

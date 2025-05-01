@@ -1,0 +1,36 @@
+-- Create projects table with specified fields
+CREATE TABLE public.projects (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  description TEXT,
+  -- Ensure each user can't have duplicate project names
+  UNIQUE (user_id, name)
+);
+
+-- Add index on user_id to optimize queries filtering by user
+CREATE INDEX idx_projects_user_id ON public.projects(user_id);
+
+-- Enable Row Level Security
+ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies so users can only access their own projects
+CREATE POLICY "Users can select their own projects" 
+  ON public.projects FOR SELECT 
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own projects" 
+  ON public.projects FOR INSERT 
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own projects" 
+  ON public.projects FOR UPDATE 
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own projects" 
+  ON public.projects FOR DELETE 
+  USING (auth.uid() = user_id);
+
+-- Grant access to authenticated users
+GRANT ALL ON public.projects TO authenticated;
