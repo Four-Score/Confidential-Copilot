@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
- * API endpoint to initiate document processing.
- * Since we're using a client-side processing approach for security,
- * this endpoint primarily creates a processing job record and returns a job ID
- * that the client can use to update progress and check status.
+ * POST endpoint to initiate document processing
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
@@ -13,8 +11,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const supabase = await createClient();
     
     // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
@@ -23,28 +21,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     
     // Parse request body
     const body = await req.json();
-    const { 
-      projectId, 
-      fileName, 
-      fileSize, 
-      fileType,
-      estimatedChunks 
-    } = body;
+    const { projectId, fileName } = body;
     
     // Validate required fields
     if (!projectId || !fileName) {
       return NextResponse.json(
-        { error: 'Project ID and file name are required' },
+        { error: 'Missing required fields: projectId and fileName are required' },
         { status: 400 }
       );
     }
     
-    // Verify project exists and belongs to user
+    // Verify project exists and user has access
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('id')
+      .select('id, name')
       .eq('id', projectId)
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .single();
       
     if (projectError || !project) {
@@ -54,24 +46,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       );
     }
     
-    // Generate a unique job ID
-    const jobId = crypto.randomUUID();
+    // Generate a unique job ID for tracking
+    const jobId = uuidv4();
     
-    // Create a job record in the database
-    // Note: In a production system, we'd have a proper jobs table
-    // For this MVP, we'll use the progress tracking endpoint
+    // Here you would typically initiate some kind of background processing task
+    // For now, we'll just return the job ID to the client
     
-    // Return the job ID to the client
     return NextResponse.json({
       jobId,
-      status: 'initialized',
-      message: 'Processing job created successfully'
-    }, { status: 201 });
+      status: 'initiated',
+      message: 'Document processing started'
+    });
     
   } catch (error) {
     console.error('Error starting document processing:', error);
     return NextResponse.json(
-      { error: 'Failed to start document processing' },
+      { error: 'Failed to initiate document processing' },
       { status: 500 }
     );
   }

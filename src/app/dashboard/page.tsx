@@ -35,7 +35,8 @@ export default function DashboardPage() {
         }
         
         const data = await response.json();
-        setProjects(data.projects || []);
+        // Fix: API returns the projects array directly, not nested under a 'projects' property
+        setProjects(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error('Error fetching projects:', err);
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
@@ -63,8 +64,9 @@ export default function DashboardPage() {
         throw new Error(errorData.error || 'Failed to create project');
       }
       
-      const data = await response.json();
-      setProjects([data.project, ...projects]);
+      const newProject = await response.json();
+      // Fix: API returns the project directly, not nested under a 'project' property
+      setProjects([newProject, ...projects]);
       setIsModalOpen(false);
     } catch (err) {
       console.error('Error creating project:', err);

@@ -20,39 +20,53 @@ async function verifyProjectAccess(supabase: any, projectId: string, userId: str
 
 // GET handler - Retrieve project details
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
     const { id: projectId } = await params;
     
-    // Initialize Supabase client with cookies
+    // Initialize Supabase client
     const supabase = await createClient();
     
     // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
       );
     }
     
-    // Verify project access
-    const project = await verifyProjectAccess(supabase, projectId, session.user.id);
-    if (!project) {
+    // Retrieve the project
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('id, name, description, created_at, user_id')
+      .eq('id', projectId)
+      .single();
+    
+    if (projectError || !project) {
       return NextResponse.json(
-        { error: 'Project not found or access denied' },
+        { error: 'Project not found' },
         { status: 404 }
       );
     }
     
-    return NextResponse.json({ project });
+    // Verify ownership
+    if (project.user_id !== user.id) {
+      return NextResponse.json(
+        { error: 'Access denied' },
+        { status: 403 }
+      );
+    }
+    
+    // Return the project details
+    return NextResponse.json(project);
     
   } catch (error) {
-    console.error('Unexpected error in project details API:', error);
+    console.error('Error retrieving project:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to retrieve project' },
       { status: 500 }
     );
   }
@@ -70,8 +84,8 @@ export async function PATCH(
     const supabase = await createClient();
     
     // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
@@ -79,7 +93,7 @@ export async function PATCH(
     }
     
     // Verify project access
-    const project = await verifyProjectAccess(supabase, projectId, session.user.id);
+    const project = await verifyProjectAccess(supabase, projectId, user.id);
     if (!project) {
       return NextResponse.json(
         { error: 'Project not found or access denied' },
@@ -158,8 +172,8 @@ export async function DELETE(
     const supabase = await createClient();
     
     // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
@@ -167,7 +181,7 @@ export async function DELETE(
     }
     
     // Verify project access
-    const project = await verifyProjectAccess(supabase, projectId, session.user.id);
+    const project = await verifyProjectAccess(supabase, projectId, user.id);
     if (!project) {
       return NextResponse.json(
         { error: 'Project not found or access denied' },

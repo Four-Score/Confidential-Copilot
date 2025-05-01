@@ -41,7 +41,8 @@ export default function ProjectPage() {
         }
         
         const projectData = await projectResponse.json();
-        setProject(projectData.project);
+        // Fix: API returns the project directly, not nested under a 'project' property
+        setProject(projectData);
         
         // Fetch project documents
         const documentsResponse = await fetch(`/api/projects/${projectId}/documents`);
@@ -54,15 +55,15 @@ export default function ProjectPage() {
         const documentsData = await documentsResponse.json();
         
         // If we have encryption service, decrypt document names
-        if (encryptionService && documentsData.documents?.length > 0) {
-          const decryptedDocuments = documentsData.documents.map((doc: any) => ({
+        if (encryptionService && Array.isArray(documentsData) && documentsData.length > 0) {
+          const decryptedDocuments = documentsData.map((doc: any) => ({
             ...doc,
             name: encryptionService.decryptMetadata(doc.name)
           }));
           setDocuments(decryptedDocuments);
         } else {
           // Store encrypted documents, they will be decrypted when encryption service is ready
-          setDocuments(documentsData.documents || []);
+          setDocuments(Array.isArray(documentsData) ? documentsData : []);
         }
       } catch (err) {
         console.error('Error fetching project data:', err);

@@ -1,95 +1,115 @@
 import { createClient } from '@/lib/supabase/server';
-import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
-// GET handler - List all projects for the authenticated user
-export async function GET(_req: NextRequest): Promise<NextResponse> {
+/**
+ * GET endpoint to retrieve all projects for the authenticated user
+ */
+export async function GET(req: NextRequest): Promise<NextResponse> {
   try {
-    // Initialize Supabase client with cookies
+    // Initialize Supabase client
     const supabase = await createClient();
     
     // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
       );
     }
     
-    // Query projects for the current user
-    const { data, error } = await supabase
+    // Retrieve projects for the authenticated user
+    const { data: projects, error: projectsError } = await supabase
       .from('projects')
-      .select('*')
+      .select('id, name, description, created_at')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
-      
-    if (error) {
-      console.error('Error fetching projects:', error);
+    
+    if (projectsError) {
+      console.error('Error fetching projects:', projectsError);
       return NextResponse.json(
         { error: 'Failed to fetch projects' },
         { status: 500 }
       );
     }
     
-    return NextResponse.json({ projects: data });
+    return NextResponse.json(projects);
     
   } catch (error) {
-    console.error('Unexpected error in projects API:', error);
+    console.error('Error in projects endpoint:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Server error' },
       { status: 500 }
     );
   }
 }
 
-// POST handler - Create a new project
+/**
+ * POST endpoint to create a new project for the authenticated user
+ */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
-    // Initialize Supabase client with cookies
-    const supabase = await createClient();
-    
-    // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
-    }
-    
     // Parse request body
     const body = await req.json();
     const { name, description } = body;
     
     // Validate required fields
-    if (!name || name.trim() === '') {
+    if (!name) {
       return NextResponse.json(
         { error: 'Project name is required' },
         { status: 400 }
       );
     }
     
+    // Initialize Supabase client
+    const supabase = await createClient();
+    
+    // Check if user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+    
+    // Check if a project with the same name already exists for this user
+    const { data: existingProject, error: checkError } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('name', name)
+      .maybeSingle();
+      
+    if (checkError) {
+      console.error('Error checking existing project:', checkError);
+    } else if (existingProject) {
+      return NextResponse.json(
+        { error: 'A project with this name already exists' },
+        { status: 409 }  // Conflict status code
+      );
+    }
+    
     // Create the new project
-    const { data, error } = await supabase
+    const { data: project, error: creationError } = await supabase
       .from('projects')
       .insert([
-        { 
-          name, 
-          description: description || null,
-          user_id: session.user.id
+        {
+          name,
+          description: description || '',
+          user_id: user.id
         }
       ])
       .select()
       .single();
-      
-    if (error) {
-      console.error('Error creating project:', error);
-      
-      // Check for unique constraint violation
-      if (error.code === '23505') {
+    
+    if (creationError) {
+      console.error('Error creating project:', creationError);
+      // Check for specific error cases
+      if (creationError.code === '23505') {
         return NextResponse.json(
           { error: 'A project with this name already exists' },
-          { status: 409 }
+          { status: 409 }  // Conflict status code
         );
       }
       
@@ -99,12 +119,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       );
     }
     
-    return NextResponse.json({ project: data }, { status: 201 });
+    return NextResponse.json(project);
     
   } catch (error) {
-    console.error('Unexpected error in projects API:', error);
+    console.error('Error in create project endpoint:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Server error' },
       { status: 500 }
     );
   }

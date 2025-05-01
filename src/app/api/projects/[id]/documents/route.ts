@@ -63,90 +63,7 @@ async function retryOperation<T>(
   throw lastError!;
 }
 
-/**
- * Handles document upload for a specific project
- * POST: Creates a new document with its vector chunks
- */
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-): Promise<NextResponse> {
-  try {
-    const projectId = params.id;
-    
-    // Initialize Supabase client
-    const supabase = await createClient();
-    
-    // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
-    }
-    
-    // Verify that the project exists and belongs to the user
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('id')
-      .eq('id', projectId)
-      .eq('user_id', session.user.id)
-      .single();
-      
-    if (projectError || !project) {
-      return NextResponse.json(
-        { error: 'Project not found or access denied' },
-        { status: 404 }
-      );
-    }
-    
-    // Parse request body
-    const body = await req.json();
-    
-    // Start a transaction using Supabase's built-in transaction support
-    const { data: documentData, error: transactionError } = await supabase.rpc(
-      'insert_document_with_chunks',
-      {
-        p_project_id: projectId,
-        p_name: body.name,
-        p_original_name: body.originalName,
-        p_type: body.type,
-        p_file_size: body.fileSize,
-        p_page_count: body.pageCount,
-        p_encrypted_content: body.encryptedContent,
-        p_encrypted_metadata: body.encryptedMetadata,
-        p_chunks: body.chunks
-      }
-    );
-    
-    if (transactionError) {
-      console.error('Transaction error:', transactionError);
-      return NextResponse.json(
-        { error: 'Failed to store document' },
-        { status: 500 }
-      );
-    }
-    
-    // Return the document ID
-    return NextResponse.json({
-      documentId: documentData.id,
-      message: 'Document uploaded successfully'
-    });
-    
-  } catch (error) {
-    console.error('Error uploading document:', error);
-    return NextResponse.json(
-      { error: 'Failed to upload document' },
-      { status: 500 }
-    );
-  }
-}
-
-/**
- * Lists all documents for a specific project
- * GET: Returns documents with optional metadata
- */
+// GET handler - Retrieve all documents for a specific project
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -154,34 +71,40 @@ export async function GET(
   try {
     const { id: projectId } = await params;
     
-    // Initialize Supabase client with cookies
+    // Initialize Supabase client
     const supabase = await createClient();
     
     // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
       );
     }
     
-    // Verify project access and ownership
+    // Verify project ownership
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('id, user_id')
+      .select('user_id')
       .eq('id', projectId)
-      .eq('user_id', session.user.id)
       .single();
       
     if (projectError || !project) {
       return NextResponse.json(
-        { error: 'Project not found or access denied' },
+        { error: 'Project not found' },
         { status: 404 }
       );
     }
     
-    // Fetch documents for this project
+    if (project.user_id !== user.id) {
+      return NextResponse.json(
+        { error: 'Access denied' },
+        { status: 403 }
+      );
+    }
+    
+    // Fetch all documents for this project
     const { data: documents, error: documentsError } = await supabase
       .from('documents')
       .select('id, name, type, upload_date, file_size, page_count')
@@ -196,12 +119,103 @@ export async function GET(
       );
     }
     
-    return NextResponse.json({ documents });
+    return NextResponse.json(documents);
     
   } catch (error) {
-    console.error('Error listing documents:', error);
+    console.error('Error in documents endpoint:', error);
     return NextResponse.json(
-      { error: 'Failed to list documents' },
+      { error: 'Server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// POST handler - Add a new document to a project
+export async function POST(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+): Promise<NextResponse> {
+  try {
+    const { id: projectId } = await params;
+    
+    // Initialize Supabase client
+    const supabase = await createClient();
+    
+    // Check if user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+    
+    // Verify project ownership
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('user_id')
+      .eq('id', projectId)
+      .single();
+      
+    if (projectError || !project) {
+      return NextResponse.json(
+        { error: 'Project not found' },
+        { status: 404 }
+      );
+    }
+    
+    if (project.user_id !== user.id) {
+      return NextResponse.json(
+        { error: 'Access denied' },
+        { status: 403 }
+      );
+    }
+    
+    // Process the document upload
+    // This would typically involve handling file upload, processing content,
+    // encrypting data, and storing metadata
+    const body = await req.json();
+    const { name, type, encryptedContent, encryptedMetadata, fileSize, pageCount } = body;
+    
+    if (!name || !type || !encryptedContent) {
+      return NextResponse.json(
+        { error: 'Missing required document fields' },
+        { status: 400 }
+      );
+    }
+    
+    // Insert the new document
+    const { data: document, error: insertError } = await supabase
+      .from('documents')
+      .insert([
+        {
+          name,
+          type,
+          encrypted_content: encryptedContent,
+          encrypted_metadata: encryptedMetadata || null,
+          file_size: fileSize,
+          page_count: pageCount,
+          project_id: projectId,
+          upload_date: new Date().toISOString()
+        }
+      ])
+      .select()
+      .single();
+      
+    if (insertError) {
+      console.error('Error inserting document:', insertError);
+      return NextResponse.json(
+        { error: 'Failed to save document' },
+        { status: 500 }
+      );
+    }
+    
+    return NextResponse.json(document);
+    
+  } catch (error) {
+    console.error('Error in document upload endpoint:', error);
+    return NextResponse.json(
+      { error: 'Server error' },
       { status: 500 }
     );
   }

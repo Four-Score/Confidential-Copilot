@@ -34,8 +34,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const supabase = await createClient();
     
     // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
@@ -83,18 +83,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
   try {
-    // Initialize Supabase client with cookies
-    const supabase = await createClient();
-    
-    // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
-    }
-    
     // Get the upload ID from the URL
     const url = new URL(req.url);
     const uploadId = url.searchParams.get('uploadId');
@@ -103,6 +91,18 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         { error: 'Upload ID is required' },
         { status: 400 }
+      );
+    }
+    
+    // Initialize Supabase client
+    const supabase = await createClient();
+    
+    // Check if user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
       );
     }
     

@@ -12,14 +12,14 @@ export async function GET(
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
-    const documentId = params.id;
+    const { id: documentId } = await params;
     
     // Initialize Supabase client with cookies
     const supabase = await createClient();
     
     // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
@@ -55,7 +55,7 @@ export async function GET(
     }
     
     // Verify document ownership
-    if (!Array.isArray(document.projects) || document.projects[0]?.user_id !== session.user.id) {
+    if (!Array.isArray(document.projects) || document.projects[0]?.user_id !== user.id) {
       return NextResponse.json(
         { error: 'Access denied' },
         { status: 403 }
@@ -104,14 +104,14 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
-    const documentId = params.id;
+    const { id: documentId } = await params;
     
     // Initialize Supabase client with cookies
     const supabase = await createClient();
     
     // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
@@ -138,7 +138,7 @@ export async function DELETE(
     }
     
     // Verify document ownership
-    if (!Array.isArray(document.projects) || document.projects[0]?.user_id !== session.user.id) {
+    if (!Array.isArray(document.projects) || document.projects[0]?.user_id !== user.id) {
       return NextResponse.json(
         { error: 'Access denied' },
         { status: 403 }

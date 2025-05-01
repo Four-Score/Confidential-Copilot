@@ -2,7 +2,44 @@
 
 ## BACKEND
 
-1. created tables for projects, data and vector_chunks of the data
+1. Created tables for projects, data and vector_chunks of the data
+(a) Projects Table: 
+*   Fields: `id` (primary key, UUID), `name` (project name), `user_id` (foreign key referencing the `auth.users` table), `created_at` (timestamp), and `description`.
+*   Constraints: Ensures each user has unique project names via a `UNIQUE` constraint.
+*   Indexes: Creates an index on `user_id` for faster queries.
+*   Row Level Security (RLS): Implements policies to ensure users can only access projects they own.
+*   Permissions: Grants all privileges on the table to authenticated users.
+
+(b) Documents Table:
+Purpose: Stores metadata and encrypted content for user-uploaded documents (PDFs, links, videos) within a project.
+*   Key Fields:
+    - `id`: UUID, primary key, auto-generated using gen_random_uuid().
+    - `project_id`: UUID, foreign key referencing the projects table, with cascading delete enabled.
+    - `name`: TEXT, stores the deterministically encrypted name of the document.
+    - `type`: document_type, an ENUM with possible values: pdf, link, video.
+    - `upload_date`: TIMESTAMPTZ, timestamp with timezone, defaults to the current time.
+    - `encrypted_content`: TEXT, stores the standard encrypted content of the document.
+    - `encrypted_metadata`: JSONB, stores deterministically encrypted metadata in JSON format.
+    - `file_size`: INTEGER, stores the file size in bytes.
+    - `page_count`: INTEGER, stores the page count (specifically for PDF documents).
+*   Relationships: Foreign key relationship with the `projects` table, ensuring cascading deletes.
+*   Security:
+    -   Row Level Security (RLS) policies ensure users can only access documents within their own projects.
+    -   Data is stored encrypted.
+*   Indexes: Index on `project_id` for efficient queries.
+
+(c) Vector Chunks Table:
+*   `id`: UUID, primary key, unique identifier for each chunk.
+*   `document_id`: UUID, foreign key referencing the `documents` table, ensures each chunk belongs to a document.
+*   `chunk_number`: INTEGER, the index of the chunk within the document.
+*   `encrypted_chunk_content`: TEXT, stores the standard encrypted content of the chunk.
+*   `encrypted_embeddings`: VECTOR(384), stores the encrypted vector embeddings of the chunk, using the pgvector extension.
+*   `metadata`: JSONB, stores deterministically encrypted metadata about the chunk (e.g., page number, position).
+
+The schema includes indexes for performance and Row Level Security (RLS) policies to ensure data access is controlled based on the user's documents. A function `match_document_chunks` is provided to perform similarity searches on the encrypted embeddings.
+
+(d) insert_document_with_chunks function:
+The provided SQL function `insert_document_with_chunks` is designed to atomically insert a document and its associated chunks into the database. It takes parameters such as `project_id`, `name`, `type`, `file_size`, `page_count`, `encrypted_content`, `encrypted_metadata`, and `chunks` (a JSON array). The function first inserts the document metadata into the `documents` table and then iterates through the `chunks` JSON array, inserting each chunk into the `vector_chunks` table. The function uses a transaction to ensure that either all operations succeed, or none do, and returns a JSON object indicating success or failure. It also grants execute permission to authenticated users.
 
 2. Implemented Encryption Utilities: (c:\Projects\Confidential-Copilot\src\lib\encryptionUtils.ts)
 Key Implementation Details
@@ -42,40 +79,40 @@ The utilities are designed to work entirely client-side, supporting zero-trust a
 (a) Confidential-Copilot\src\app\api\projects\route.ts
 This code defines API routes for managing projects in a Next.js application using Supabase for authentication and database interactions. 
 The `GET` handler retrieves a list of projects for the authenticated user, while the `POST` handler creates a new project. 
-Both handlers use the Supabase client (`createClient`) to interact with the Supabase database, and they handle authentication checks, data validation,
-and error responses. The API uses `next/server`'s `NextRequest` and `NextResponse` for request and response handling.
+Both handlers use the Supabase client (`createClient`) to interact with the Supabase database, and they handle authentication checks using `supabase.auth.getUser()` for improved security, data validation,
+and error responses. The API uses `next/server`'s `NextRequest` and `NextResponse` for request and response handling. The POST endpoint also includes validation to prevent creation of duplicate project names for the same user.
 
 (b) Confidential-Copilot\src\app\api\projects\[id]\route.ts
 This code defines API endpoints for managing projects in a Next.js application with Supabase authentication.
 -   `verifyProjectAccess`: A helper function to verify if a project exists and belongs to the given user.
--   `GET`: Retrieves project details by ID.
+-   `GET`: Retrieves project details by ID, using `supabase.auth.getUser()` for secure authentication.
 -   `PATCH`: Updates project information (name, description).
 -   `DELETE`: Deletes a project by ID (cascading deletion is assumed for related documents and vector chunks).
 
 6. Document Upload API Implementation
 (a) Document Validation API Route: Confidential-Copilot\src\app\api\documents\validate\route.ts
-This code defines an API endpoint (`POST` in route.ts) in a Next.js application that validates a file upload. It uses Supabase for authentication and checks if the user has a valid session using `supabase.auth.getSession()`. The endpoint receives a file via `FormData`, checks if it's a PDF, and validates its size against `MAX_FILE_SIZE`. If the file passes validation, it returns a success response with file metadata; otherwise, it returns an error. The `createClient()` function initializes a Supabase client with cookie handling for server-side operations.
+This code defines an API endpoint (`POST` in route.ts) in a Next.js application that validates a file upload. It uses Supabase for authentication and checks if the user has a valid session using `supabase.auth.getUser()`. The endpoint receives a file via `FormData`, checks if it's a PDF, and validates its size against `MAX_FILE_SIZE`. If the file passes validation, it returns a success response with file metadata; otherwise, it returns an error. The `createClient()` function initializes a Supabase client with cookie handling for server-side operations.
 
 (b) Document Upload API Route: 
 Confidential-Copilot\src\app\api\projects\[projectId]\documents\route.ts
-This code defines two API endpoints in route.ts for handling documents within a project. The `POST` function handles document uploads, taking `id` from the route parameters. It authenticates the user, verifies project ownership, and then inserts the document metadata and chunks into the Supabase database. If chunk insertion fails, it attempts to delete the document. The `GET` function retrieves a list of documents for a given `id`, also ensuring user authentication and project ownership. Both functions use the `createClient` function to initialize a Supabase client and return appropriate JSON responses with error handling.
+This code defines two API endpoints in route.ts for handling documents within a project. The `POST` function handles document uploads, taking `id` from the route parameters. It authenticates the user using `supabase.auth.getUser()`, verifies project ownership, and then inserts the document metadata and chunks into the Supabase database. If chunk insertion fails, it attempts to delete the document. The `GET` function retrieves a list of documents for a given `id`, also ensuring user authentication and project ownership. Both functions use the `createClient` function to initialize a Supabase client and return appropriate JSON responses with error handling.
 
 (c) Document Metadata API Route: 
 Confidential-Copilot\src\app\api\documents\[id]\route.ts
-This code defines two API endpoints for handling document-specific operations in a Next.js application using Supabase for database interactions and authentication. The `GET` function retrieves document details and metadata based on the document ID, verifying user authentication and ownership before returning the document's metadata, including the project name and chunk count. The `DELETE` function removes a document and its associated chunks, also ensuring user authentication and ownership before performing the deletion. Both functions handle potential errors and return appropriate JSON responses.
+This code defines two API endpoints for handling document-specific operations in a Next.js application using Supabase for database interactions and authentication. The `GET` function retrieves document details and metadata based on the document ID, verifying user authentication using `supabase.auth.getUser()` and ownership before returning the document's metadata, including the project name and chunk count. The `DELETE` function removes a document and its associated chunks, also ensuring user authentication and ownership before performing the deletion. Both functions handle potential errors and return appropriate JSON responses.
 
 (d) Document Upload Progress API Route: Confidential-Copilot\src\app\api\documents\progress\route.ts
-This code defines an API route (`route.ts`) in a Next.js application for tracking the progress of document uploads. It uses Supabase for authentication and stores progress information in an in-memory object `progressStore`. The `POST` method updates the progress, status, and any error messages associated with a given `uploadId`. The `GET` method retrieves the progress data for a specific `uploadId`. The `cleanupOldEntries` function periodically removes old entries from the `progressStore` to prevent memory leaks. The `createClient` function initializes a Supabase client with cookie handling for server-side operations, ensuring that user sessions are maintained. The Supabase client is then used to call `getSession` to ensure the user is authenticated.
+This code defines an API route (`route.ts`) in a Next.js application for tracking the progress of document uploads. It uses Supabase for authentication and stores progress information in an in-memory object `progressStore`. The `POST` method updates the progress, status, and any error messages associated with a given `uploadId`. The `GET` method retrieves the progress data for a specific `uploadId`. The `cleanupOldEntries` function periodically removes old entries from the `progressStore` to prevent memory leaks. The `createClient` function initializes a Supabase client with cookie handling for server-side operations, ensuring that user sessions are maintained. The Supabase client is then used to call `supabase.auth.getUser()` to ensure the user is authenticated.
 
 7. Processing Pipeline API Implementation
 (a) Processing Start API Endpoint: Confidential-Copilot\src\app\api\processing\start\route.ts
-This code defines an API endpoint (`POST` in route.ts) in a Next.js application to initiate document processing. It uses Supabase for authentication and database interactions. The `POST` function first checks if the user is authenticated using `supabase.auth.getSession()`. If authenticated, it parses the request body to extract `projectId` and `fileName`, validates their presence, and verifies that the project exists and belongs to the user by querying the `projects` table. A unique `jobId` is generated, and the function returns this `jobId` along with a status message to the client. Error handling is included to return appropriate HTTP status codes for authentication failures, missing parameters, project not found, and other server errors.
+This code defines an API endpoint (`POST` in route.ts) in a Next.js application to initiate document processing. It uses Supabase for authentication and database interactions. The `POST` function first checks if the user is authenticated using `supabase.auth.getUser()`. If authenticated, it parses the request body to extract `projectId` and `fileName`, validates their presence, and verifies that the project exists and belongs to the user by querying the `projects` table. A unique `jobId` is generated, and the function returns this `jobId` along with a status message to the client. Error handling is included to return appropriate HTTP status codes for authentication failures, missing parameters, project not found, and other server errors.
 
 (b) Processing Status API Endpoint: Confidential-Copilot\src\app\api\processing\status\[jobId]\route.ts
-This code defines a `GET` function in route.ts that serves as an API endpoint to check the status of a document processing job, identified by `jobId`. It initializes a Supabase client, verifies user authentication via `supabase.auth.getSession()`, and then makes an internal `fetch` request to the `/api/documents/progress` endpoint, passing the `jobId` as an `uploadId` parameter. If the internal request is successful, it returns the status data as a JSON response; otherwise, it returns an error. Error handling is included to catch any exceptions during the process.
+This code defines a `GET` function in route.ts that serves as an API endpoint to check the status of a document processing job, identified by `jobId`. It initializes a Supabase client, verifies user authentication via `supabase.auth.getUser()`, and then makes an internal `fetch` request to the `/api/documents/progress` endpoint, passing the `jobId` as an `uploadId` parameter. If the internal request is successful, it returns the status data as a JSON response; otherwise, it returns an error. Error handling is included to catch any exceptions during the process.
 
 (c) Processing Cancel API Endpoint: Confidential-Copilot\src\app\api\processing\cancel\[jobId]\route.ts
-This code defines a Next.js API endpoint (`POST` at `/api/documents/cancel/[jobId]`) to cancel a document processing job. It extracts the `jobId` from the URL parameters, initializes a Supabase client using `createClient()`, and verifies user authentication via `supabase.auth.getSession()`. Upon successful authentication, it sends a `POST` request to `/api/documents/progress` to update the job's status to 'cancelled'. The function returns a JSON response indicating success or failure, along with appropriate HTTP status codes. Error handling is included to catch and log any exceptions during the cancellation process.
+This code defines a Next.js API endpoint (`POST` at `/api/documents/cancel/[jobId]`) to cancel a document processing job. It extracts the `jobId` from the URL parameters, initializes a Supabase client using `createClient()`, and verifies user authentication via `supabase.auth.getUser()`. Upon successful authentication, it sends a `POST` request to `/api/documents/progress` to update the job's status to 'cancelled'. The function returns a JSON response indicating success or failure, along with appropriate HTTP status codes. Error handling is included to catch and log any exceptions during the cancellation process.
 
 (d) Create a Client-Side Processing Utility: Confidential-Copilot\src\lib\processingUtils.ts
 This code defines a client-side document processing pipeline in processingUtils.ts for a React/TypeScript application. It includes functions to handle PDF processing, embedding generation, encryption, and interaction with a backend API. The `processPdfDocument` function orchestrates the entire process: it extracts text from a PDF using `processPdfFile`, generates embeddings using `generateBatchEmbeddings`, encrypts the data using functions from `encryptionUtils` (like `encryptText`, `encryptMetadata`, and `encryptVector`), and uploads the encrypted data to the server. Helper functions like `initiateProcessingJob`, `updateProcessingProgress`, and `cancelProcessingJob` manage the communication with the backend to track and control the processing job. The code also defines types and interfaces such as `ProcessingStatus`, `ProcessingProgressEvent`, and `ProcessingOptions` to manage the state and configuration of the document processing pipeline.
@@ -101,10 +138,6 @@ Error Handling:
 - Comprehensive error handling at each stage
 - Proper error reporting to both the client and the progress tracking system
 
-
-
-
-
 ## FRONTEND
 
 1. Dashboard Page Implementation
@@ -129,7 +162,7 @@ The `EmptyState` component in EmptyState.tsx renders a UI element displayed when
 
 2. Project Page Implementation
 (a) Project Page Component: Confidential-Copilot\src\app\projects\[id]\page.tsx
-The `ProjectPage` component fetches and displays project details and documents. It uses `fetchProjectData` to retrieve data, handles document uploads with `handleUploadComplete`, and manages document deletion with `handleDeleteDocument`. It also decrypts document names using the `encryptionService` when available.
+The `ProjectPage` component fetches and displays project details and documents. It uses `fetchProjectData` to retrieve data, handles document uploads with `handleUploadComplete`, and manages document deletion with `handleDeleteDocument`. It also decrypts document names using the `encryptionService` when available. The component has been updated to correctly handle the API response structure for project data.
 
 (b) Document Type Definition: Confidential-Copilot\src\types\document.ts
 The code defines a TypeScript interface `Document` representing a document's structure, including fields like `id`, `project_id`, `name`, `type`, `upload_date`, `file_size`, `page_count`, and `encrypted_metadata`.
@@ -143,7 +176,6 @@ The `ProjectHeader` component displays project information (name, description, c
 (e) Document Card Component: Confidential-Copilot\src\components\documents\DocumentCard.tsx
 *   DocumentCard.tsx: This React component displays document details like name, upload date, type, and size, and includes a delete confirmation feature.
 *   `formatFileSize`: This function converts a file size in bytes to a human-readable format (bytes, KB, or MB).
-
 
 3. File Upload Components Implementation
 (a) FileUploader Component: Confidential-Copilot\src\components\uploads\FileUploader.tsx
@@ -162,7 +194,6 @@ This React component, `PDFPreview`, generates a preview of a PDF file using a bl
 
 (e) Document Uploader Component: Confidential-Copilot\src\components\documents\DocumentUploader.tsx
 DocumentUploader.tsx is a React component that handles the uploading and processing of documents, specifically PDFs, in a secure manner. It uses several custom hooks and components to achieve this: `useEncryptionService` for encryption, `useDocumentProcessor` for handling the file processing pipeline, `FileUploader` for the drag-and-drop file selection, and `PDFPreview` for displaying a preview of the selected PDF. The component manages the file selection via `handleFileSelect`, initiates the upload process with `startUpload` which calls `processFile` from the `useDocumentProcessor` hook, and allows canceling the upload via `handleCancelUpload`. It also displays progress and status updates during the upload and processing stages, ensuring a secure, client-side processing workflow.
-
 
 ## Client-Side Processing 
 
