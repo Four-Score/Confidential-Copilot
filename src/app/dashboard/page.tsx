@@ -134,8 +134,11 @@ export default function DashboardPage() {
                 <main className={`flex-1 p-4 ${!isSidebarOpen ? 'ml-10' : ''}`}>
                     {/* Top Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                        <div className="bg-white p-4 rounded-md shadow-sm border border-gray-100">
-                            <h2 className="font-bold text-sm">PROJECTS</h2>
+                        <div 
+                            onClick={navigateToProjects}
+                            className="bg-white p-4 rounded-md shadow-sm border border-gray-100 hover:shadow-md cursor-pointer transition-all duration-200"
+                        >
+                            <h2 className="font-bold text-sm text-blue-700">PROJECTS</h2>
                             <p className="text-xs text-gray-500">Since last month</p>
                         </div>
                         <div className="bg-white p-4 rounded-md shadow-sm border border-gray-100">

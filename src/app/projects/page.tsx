@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
+import { useRouter } from 'next/navigation';
 import ProjectList from '@/components/projects/ProjectList';
 import CreateProjectModal from '@/components/projects/CreateProjectModal';
 import EmptyState from '@/components/projects/EmptyState';
 import { Project } from '@/types/project';
 
 export default function ProjectsPage() {
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -123,8 +125,19 @@ export default function ProjectsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">My Projects</h1>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div>
+          <button 
+            onClick={() => router.push('/dashboard')}
+            className="mb-3 flex items-center text-blue-600 hover:text-blue-800 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+            </svg>
+            Back to Dashboard
+          </button>
+          <h1 className="text-3xl font-bold text-gray-800">My Projects</h1>
+        </div>
         <button
           onClick={() => setIsModalOpen(true)}
           className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition duration-200"
