@@ -181,18 +181,27 @@ This analysis traces the complete data flow of a PDF document from initial uploa
 
 ### API Endpoint Processing
 1. In route.ts, the POST handler:
-   - Authenticates user via Supabase: `supabase.auth.getSession()`
+   - Authenticates user via Supabase: `supabase.auth.getUser()`
    - Verifies project ownership
-   - Extracts data from request body
+   - Extracts data from request body including chunks array
 
 ### Database Transaction Processing
-1. Ideally using the `insert_document_with_chunks` database function:
-   ```sql
-   SELECT insert_document_with_chunks(
-     p_project_id, p_name, p_original_name, p_type, 
-     p_file_size, p_page_count, p_encrypted_content,
-     p_encrypted_metadata, p_chunks
-   )
+1. Using the `insert_document_with_chunks` database function:
+   ```typescript
+   const { data, error } = await supabase.rpc(
+     'insert_document_with_chunks',
+     {
+       p_project_id: projectId,
+       p_name: name,
+       p_original_name: originalName || name,
+       p_type: type,
+       p_file_size: fileSize,
+       p_page_count: pageCount || 1,
+       p_encrypted_content: encryptedContent,
+       p_encrypted_metadata: encryptedMetadata || {},
+       p_chunks: chunks // Passed directly as a JSONB array
+     }
+   );
    ```
 
 2. This function executes a transaction that:
@@ -213,6 +222,14 @@ This analysis traces the complete data flow of a PDF document from initial uploa
        encrypted_embeddings, metadata
      ) VALUES (...);
      ```
+
+3. The API returns a response with:
+   ```typescript
+   {
+     documentId: data.id,
+     success: true
+   }
+   ```
 
 ### Database Schema
 1. `documents` table structure:

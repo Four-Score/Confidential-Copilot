@@ -172,45 +172,62 @@ export async function POST(
     }
     
     // Process the document upload
-    // This would typically involve handling file upload, processing content,
-    // encrypting data, and storing metadata
-    const body = await req.json();
-    const { name, type, encryptedContent, encryptedMetadata, fileSize, pageCount } = body;
+    const body: DocumentUploadBody = await req.json();
+    const { 
+      name, 
+      originalName, 
+      type, 
+      encryptedContent, 
+      encryptedMetadata, 
+      fileSize, 
+      pageCount, 
+      chunks 
+    } = body;
     
-    if (!name || !type || !encryptedContent) {
+    if (!name || !type || !encryptedContent || !chunks) {
       return NextResponse.json(
         { error: 'Missing required document fields' },
         { status: 400 }
       );
     }
     
-    // Insert the new document
-    const { data: document, error: insertError } = await supabase
-      .from('documents')
-      .insert([
+    // Use the insert_document_with_chunks function to insert both document and chunks in a transaction
+    try {
+      const { data, error } = await supabase.rpc(
+        'insert_document_with_chunks',
         {
-          name,
-          type,
-          encrypted_content: encryptedContent,
-          encrypted_metadata: encryptedMetadata || null,
-          file_size: fileSize,
-          page_count: pageCount,
-          project_id: projectId,
-          upload_date: new Date().toISOString()
+          p_project_id: projectId,
+          p_name: name,
+          p_original_name: originalName || name,
+          p_type: type,
+          p_file_size: fileSize,
+          p_page_count: pageCount || 1,
+          p_encrypted_content: encryptedContent,
+          p_encrypted_metadata: encryptedMetadata || {},
+          p_chunks: chunks // Remove JSON.stringify() to pass chunks directly as a JSONB array
         }
-      ])
-      .select()
-      .single();
+      );
       
-    if (insertError) {
-      console.error('Error inserting document:', insertError);
+      if (error) {
+        console.error('Error inserting document with chunks:', error);
+        return NextResponse.json(
+          { error: 'Failed to save document and chunks' },
+          { status: 500 }
+        );
+      }
+      
+      return NextResponse.json({
+        documentId: data.id,
+        success: true
+      });
+      
+    } catch (dbError) {
+      console.error('Database transaction failed:', dbError);
       return NextResponse.json(
-        { error: 'Failed to save document' },
+        { error: 'Database transaction failed' },
         { status: 500 }
       );
     }
-    
-    return NextResponse.json(document);
     
   } catch (error) {
     console.error('Error in document upload endpoint:', error);

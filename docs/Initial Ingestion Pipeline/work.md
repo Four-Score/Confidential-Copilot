@@ -95,7 +95,7 @@ This code defines an API endpoint (`POST` in route.ts) in a Next.js application 
 
 (b) Document Upload API Route: 
 Confidential-Copilot\src\app\api\projects\[projectId]\documents\route.ts
-This code defines two API endpoints in route.ts for handling documents within a project. The `POST` function handles document uploads, taking `id` from the route parameters. It authenticates the user using `supabase.auth.getUser()`, verifies project ownership, and then inserts the document metadata and chunks into the Supabase database. If chunk insertion fails, it attempts to delete the document. The `GET` function retrieves a list of documents for a given `id`, also ensuring user authentication and project ownership. Both functions use the `createClient` function to initialize a Supabase client and return appropriate JSON responses with error handling.
+This code defines two API endpoints in route.ts for handling documents within a project. The `POST` function handles document uploads, taking `id` from the route parameters. It authenticates the user using `supabase.auth.getUser()`, verifies project ownership, and then properly uses the `insert_document_with_chunks` database function to insert both the document metadata and its chunks in a single transaction. This ensures that data is atomically saved to both the `documents` and `vector_chunks` tables. The `GET` function retrieves a list of documents for a given `id`, also ensuring user authentication and project ownership. Both functions use the `createClient` function to initialize a Supabase client and return appropriate JSON responses with error handling.
 
 (c) Document Metadata API Route: 
 Confidential-Copilot\src\app\api\documents\[id]\route.ts
