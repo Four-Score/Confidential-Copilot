@@ -207,7 +207,7 @@ DocumentUploader.tsx is a React component that handles the uploading and process
 
 ## Client-Side Processing 
 
-8. Client-Side Processing Implementation
+1. Client-Side Processing Implementation
 (a) Create Enhanced Client-Side Processing Configuration File: Confidential-Copilot\src\lib\processingConfig.ts
 This code defines a configuration interface `PDFProcessingConfig` for PDF processing, provides a default configuration, and a function to override the default configuration with user-provided values.
 
