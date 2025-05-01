@@ -64,6 +64,8 @@ Standalone Utilities:
 Functions like encryptText, encryptMetadata, and encryptVector can be used outside React components
 Each function checks if the service is initialized and initializes it if needed
 
+- **Buffer Handling Enhancement**: The `decryptMetadata` function in `encryptionUtils.ts` has been improved to handle serialized Buffer objects that are returned from the database. It now properly detects and converts JSON Buffer representations (`{type:"Buffer", data:[...]}`) back to actual Buffer objects before decryption, ensuring compatibility with the DCPE library requirements.
+
 3. Created PDF Processing Utilities: (c:\Projects\Confidential-Copilot\src\lib\pdfUtils.ts)
 This file, pdfUtils.ts, provides utilities for processing PDF files. It includes functions to `validatePdfFile` by checking its type and size, `extractTextFromPdf` to extract text and metadata, `chunkText` to divide the extracted text into smaller chunks, and `processPdfFile` to perform the complete PDF processing pipeline. It also defines interfaces `PDFExtractionResult` and `DocumentChunk` to structure the extracted data and chunks. Constants like `MAX_FILE_SIZE`, `DEFAULT_CHUNK_SIZE`, and `DEFAULT_CHUNK_OVERLAP` define limits and default values for file processing.
 

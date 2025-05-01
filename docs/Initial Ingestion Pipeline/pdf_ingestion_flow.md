@@ -280,6 +280,25 @@ This analysis traces the complete data flow of a PDF document from initial uploa
      ```
    - Returns document array to client
 
+
+### Buffer Serialization Handling
+
+1. During document retrieval, encrypted data is stored and returned as serialized Buffer objects:
+   ```json
+   {"type":"Buffer","data":[119,68,84,137,...]}
+   ```
+
+2. The `encryptionUtils.ts` file's `decryptMetadata` function handles three cases:
+   - Serialized Buffer objects (`{type:"Buffer", data:[...]}`)
+   - Stringified serialized Buffer objects (as JSON strings)
+   - Direct Buffer objects
+
+3. The decryption process:
+   - Detects the format of the encrypted data
+   - Converts serialized Buffer representations back to actual Buffer objects
+   - Passes the proper Buffer to the DCPE library for decryption
+   - Returns the decrypted plaintext
+
 ### Document Display Processing
 1. Documents are passed to `DocumentList` component which:
    - Maps each document to a `DocumentCard` component

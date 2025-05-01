@@ -195,24 +195,42 @@ export class EncryptionService {
    * @param encryptedMetadata The encrypted metadata
    * @returns The decrypted metadata
    */
-  decryptMetadata(encryptedMetadata: string): string {
-    this.ensureInitialized();
-    try {
-      // Check if the input is a valid format for decryption
-      // If it doesn't look like encrypted data, return it as-is
-      if (!encryptedMetadata || typeof encryptedMetadata !== 'string' || !encryptedMetadata.startsWith('enc_')) {
-        console.warn('Received unencrypted metadata, returning as-is:', encryptedMetadata);
-        return encryptedMetadata;
-      }
-
-      // Try to decrypt the metadata
-      return this.dcpe!.decryptMetadata(encryptedMetadata);
-    } catch (error) {
-      console.error("Failed to decrypt metadata:", error);
-      
-      // Fallback: if decryption fails, return the original string
-      // This prevents UI from breaking completely when encryption errors occur
+  decryptMetadata(encryptedMetadata: any): string {
+    if (!this.dcpe || !encryptedMetadata) {
       return encryptedMetadata;
+    }
+  
+    // Handle case where the input is a serialized Buffer object
+    if (typeof encryptedMetadata === 'object' && encryptedMetadata.type === 'Buffer' && Array.isArray(encryptedMetadata.data)) {
+      try {
+        // Convert the serialized Buffer back to an actual Buffer
+        const buffer = Buffer.from(encryptedMetadata.data);
+        return this.dcpe.decryptMetadata(buffer);
+      } catch (error) {
+        console.error('Error converting serialized Buffer to Buffer:', error);
+        return JSON.stringify(encryptedMetadata);
+      }
+    }
+  
+    // Handle case where it might be a stringified JSON representation of a Buffer
+    if (typeof encryptedMetadata === 'string' && encryptedMetadata.includes('"type":"Buffer"')) {
+      try {
+        const parsed = JSON.parse(encryptedMetadata);
+        if (parsed && parsed.type === 'Buffer' && Array.isArray(parsed.data)) {
+          const buffer = Buffer.from(parsed.data);
+          return this.dcpe.decryptMetadata(buffer);
+        }
+      } catch (e) {
+        // Not valid JSON or doesn't have expected structure, continue with original logic
+      }
+    }
+  
+    // Original logic for normal encrypted strings
+    try {
+      return this.dcpe.decryptMetadata(encryptedMetadata);
+    } catch (error) {
+      console.log('Received unencrypted metadata, returning as-is:', encryptedMetadata);
+      return typeof encryptedMetadata === 'object' ? JSON.stringify(encryptedMetadata) : encryptedMetadata;
     }
   }
 
