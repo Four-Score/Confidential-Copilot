@@ -198,10 +198,21 @@ export class EncryptionService {
   decryptMetadata(encryptedMetadata: string): string {
     this.ensureInitialized();
     try {
+      // Check if the input is a valid format for decryption
+      // If it doesn't look like encrypted data, return it as-is
+      if (!encryptedMetadata || typeof encryptedMetadata !== 'string' || !encryptedMetadata.startsWith('enc_')) {
+        console.warn('Received unencrypted metadata, returning as-is:', encryptedMetadata);
+        return encryptedMetadata;
+      }
+
+      // Try to decrypt the metadata
       return this.dcpe!.decryptMetadata(encryptedMetadata);
     } catch (error) {
       console.error("Failed to decrypt metadata:", error);
-      throw new Error("Failed to decrypt metadata");
+      
+      // Fallback: if decryption fails, return the original string
+      // This prevents UI from breaking completely when encryption errors occur
+      return encryptedMetadata;
     }
   }
 

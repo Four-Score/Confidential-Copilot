@@ -231,6 +231,16 @@ This analysis traces the complete data flow of a PDF document from initial uploa
    }
    ```
 
+### Document Retrieval Architecture
+1. Document details are retrieved through project-scoped endpoints:
+   - `GET /api/projects/${projectId}/documents/${documentId}` - Get details of a specific document
+   - `GET /api/projects/${projectId}/documents` - List all documents in a project
+
+2. Error handling in document metadata decryption:
+   - Gracefully handles malformed encrypted data
+   - Validates encryption format before attempting decryption
+   - Falls back to returning original values when decryption fails
+
 ### Database Schema
 1. `documents` table structure:
    - `id`: UUID (primary key) - `gen_random_uuid()`

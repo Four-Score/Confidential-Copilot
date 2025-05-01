@@ -95,13 +95,17 @@ This code defines an API endpoint (`POST` in route.ts) in a Next.js application 
 
 (b) Document Upload API Route: 
 Confidential-Copilot\src\app\api\projects\[projectId]\documents\route.ts
-This code defines two API endpoints in route.ts for handling documents within a project. The `POST` function handles document uploads, taking `id` from the route parameters. It authenticates the user using `supabase.auth.getUser()`, verifies project ownership, and then properly uses the `insert_document_with_chunks` database function to insert both the document metadata and its chunks in a single transaction. This ensures that data is atomically saved to both the `documents` and `vector_chunks` tables. The `GET` function retrieves a list of documents for a given `id`, also ensuring user authentication and project ownership. Both functions use the `createClient` function to initialize a Supabase client and return appropriate JSON responses with error handling.
+This code defines two API endpoints in route.ts for handling documents within a project. The `POST` function handles document uploads, taking `id` from the route parameters. It authenticates the user using `supabase.auth.getUser()`, verifies project ownership, and then properly uses the `insert_document_with_chunks` database function to insert both the document metadata and its chunks in a single transaction. This ensures data is atomically saved to both the `documents` and `vector_chunks` tables. The `GET` function retrieves a list of documents for a given `id`, also ensuring user authentication and project ownership. Both functions use the `createClient` function to initialize a Supabase client and return appropriate JSON responses with error handling.
 
-(c) Document Metadata API Route: 
+(c) Document Retrieval API Route:
+Confidential-Copilot\src\app\api\projects\[id]\documents\[documentId]\route.ts
+This code defines an API endpoint for retrieving a specific document within a project context. It authenticates the user, verifies project ownership, and checks that the document belongs to the specified project. The endpoint returns document metadata including the document ID, name, type, upload date, and chunk count. This API route is particularly important for retrieving document details immediately after upload.
+
+(d) Document Metadata API Route: 
 Confidential-Copilot\src\app\api\documents\[id]\route.ts
 This code defines two API endpoints for handling document-specific operations in a Next.js application using Supabase for database interactions and authentication. The `GET` function retrieves document details and metadata based on the document ID, verifying user authentication using `supabase.auth.getUser()` and ownership before returning the document's metadata, including the project name and chunk count. The `DELETE` function removes a document and its associated chunks, also ensuring user authentication and ownership before performing the deletion. Both functions handle potential errors and return appropriate JSON responses.
 
-(d) Document Upload Progress API Route: Confidential-Copilot\src\app\api\documents\progress\route.ts
+(e) Document Upload Progress API Route: Confidential-Copilot\src\app\api\documents\progress\route.ts
 This code defines an API route (`route.ts`) in a Next.js application for tracking the progress of document uploads. It uses Supabase for authentication and stores progress information in an in-memory object `progressStore`. The `POST` method updates the progress, status, and any error messages associated with a given `uploadId`. The `GET` method retrieves the progress data for a specific `uploadId`. The `cleanupOldEntries` function periodically removes old entries from the `progressStore` to prevent memory leaks. The `createClient` function initializes a Supabase client with cookie handling for server-side operations, ensuring that user sessions are maintained. The Supabase client is then used to call `supabase.auth.getUser()` to ensure the user is authenticated.
 
 7. Processing Pipeline API Implementation

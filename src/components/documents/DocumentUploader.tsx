@@ -51,8 +51,8 @@ export default function DocumentUploader({
       });
       
       if (result.success && result.documentId) {
-        // Get document details
-        const response = await fetch(`/api/documents/${result.documentId}`);
+        // Get document details using the correct API path
+        const response = await fetch(`/api/projects/${projectId}/documents/${result.documentId}`);
         
         if (!response.ok) {
           throw new Error('Failed to get document details after upload');
