@@ -10,6 +10,7 @@ const progressStore: Record<string, {
   status: 'pending' | 'processing' | 'completed' | 'error';
   error?: string;
   lastUpdated: Date;
+  contentType: 'document' | 'website';
 }> = {};
 
 // Clean up old entries periodically
@@ -44,8 +45,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     
     // Parse request body
     const body = await req.json();
-    const { uploadId, progress, status, error } = body;
-    
+    const { uploadId, progress, status, error, contentType = 'document' } = body;
+
     if (!uploadId || typeof progress !== 'number' || !status) {
       return NextResponse.json(
         { error: 'Invalid request parameters' },
@@ -58,6 +59,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       progress: Math.min(100, Math.max(0, progress)), // Ensure between 0-100
       status,
       error,
+      contentType, // Include the content type in the stored data
       lastUpdated: new Date()
     };
     
@@ -120,6 +122,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       progress: progressData.progress,
       status: progressData.status,
       error: progressData.error,
+      contentType: progressData.contentType || 'document', 
       lastUpdated: progressData.lastUpdated
     });
     
