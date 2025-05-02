@@ -11,17 +11,19 @@ import { KeyMaterial, SignUpStep } from '@/types/auth';
 import { RecoveryKeyDisplay } from './RecoveryKeyDisplay';
 import { getCookie } from 'cookies-next';
 
+// Define a type for the key material including the generated key
+type KeyMaterialWithGeneratedKey = KeyMaterial & { generatedSymmetricKey: CryptoKey };
 
 export function SignUpForm() {
   const [currentStep, setCurrentStep] = useState<SignUpStep>(SignUpStep.CREDENTIALS);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState({ email: '', password: '' });
-  const [keyMaterial, setKeyMaterial] = useState<KeyMaterial | null>(null);
+  // Update the type of keyMaterial state
+  const [keyMaterial, setKeyMaterial] = useState<KeyMaterialWithGeneratedKey | null>(null);
   const [hasSavedRecoveryKey, setHasSavedRecoveryKey] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  
   const router = useRouter();
   const { signup, storeGeneratedKeys, isLoading, error } = useAuthStore();
 
@@ -85,8 +87,8 @@ export function SignUpForm() {
       const result = await signup(email, password);
       
       if (result.success && result.keyMaterial) {
-        // Store the key material and move to the recovery key step
-        setKeyMaterial(result.keyMaterial);
+        // Store the key material (including the generated key) and move to the recovery key step
+        setKeyMaterial(result.keyMaterial as KeyMaterialWithGeneratedKey); // Cast to the updated type
         setCurrentStep(SignUpStep.RECOVERY_KEY);
       } else if (result.error) {
         setErrors(prev => ({ ...prev, email: result.error || '' }));
@@ -95,14 +97,13 @@ export function SignUpForm() {
       console.error('Signup error:', error);
       setErrors(prev => ({ ...prev, email: getErrorMessage(error) }));
     } finally {
-      setIsTransitioning(false); // Add this line
+      setIsTransitioning(false);
     }
   };
-  
 
   const handleConfirmRecoveryKey = async () => {
-    if (!keyMaterial) {
-      setErrors(prev => ({ ...prev, email: 'Missing key material. Please try again.' }));
+    if (!keyMaterial || !keyMaterial.generatedSymmetricKey) { // Check for generated key too
+      setErrors(prev => ({ ...prev, email: 'Missing key material or generated key. Please try again.' }));
       setCurrentStep(SignUpStep.CREDENTIALS);
       return;
     }
@@ -116,7 +117,8 @@ export function SignUpForm() {
     setIsTransitioning(true);
 
     try {
-      const result = await storeGeneratedKeys(keyMaterial);
+      // Pass the keyMaterial AND the generatedSymmetricKey to storeGeneratedKeys
+      const result = await storeGeneratedKeys(keyMaterial, keyMaterial.generatedSymmetricKey);
       
       if (result.success) {
         setCurrentStep(SignUpStep.SUCCESS);
@@ -132,7 +134,7 @@ export function SignUpForm() {
       setErrors(prev => ({ ...prev, email: getErrorMessage(error) }));
       setCurrentStep(SignUpStep.CREDENTIALS);
     } finally {
-      setIsTransitioning(false); // Add this line
+      setIsTransitioning(false);
     }
   };
 

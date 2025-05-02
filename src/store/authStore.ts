@@ -67,9 +67,13 @@ interface AuthState {
             encKeyRecoveryB64: string;
             ivRecoveryB64: string;
             recoveryKeyString: string; // The key to display to the user
+            generatedSymmetricKey: CryptoKey; // <-- Add the generated key
         } | null;
     }>;
-    storeGeneratedKeys: (keyMaterial: NonNullable<AuthState['signup']['prototype']['keyMaterial']>) => Promise<{ success: boolean; error?: string }>;
+    storeGeneratedKeys: (
+        keyMaterial: NonNullable<AuthState['signup']['prototype']['keyMaterial']>,
+        generatedKey: CryptoKey // <-- Add parameter for the key
+    ) => Promise<{ success: boolean; error?: string }>;
     logout: () => Promise<void>;
     recoverWithKey: (recoveryKeyData: RecoveryKeyData) => Promise<{ success: boolean; error?: string }>; // For use after recovery
     resetPasswordAndUpdateKeys: (newPassword: string) => Promise<{ success: boolean; error?: string }>; // For use after recovery or password change
@@ -310,7 +314,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     signup: async (email: string, password: string): Promise<{
         success: boolean;
         error?: string;
-        keyMaterial?: KeyMaterial | null;
+        keyMaterial?: KeyMaterial & { generatedSymmetricKey: CryptoKey } | null; // <-- Update return type
         }> => {
         set({ isLoading: true, error: null });
         const supabase = createClient();
@@ -368,7 +372,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             console.log("Generating cryptographic keys...");
             const salt: Uint8Array = generateSalt();
             const passwordDerivedKey: CryptoKey = await deriveKeyFromPassword(password, salt);
-            const symmetricKey: CryptoKey = await generateRandomSymmetricKey();
+            const symmetricKey: CryptoKey = await generateRandomSymmetricKey(); // <-- Keep this key
             const recoveryKeyString: string = generateRecoveryKeyString(); // Generate the string for the user
             const recoveryDerivedKey: CryptoKey = await deriveKeyFromRecoveryString(recoveryKeyString, salt); // Use same salt
 
@@ -385,8 +389,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
             console.log("Keys generated and encrypted.");
 
-            // 5. Return success and the necessary key material
-            // The UI will display recoveryKeyString and call storeGeneratedKeys on confirmation
+            // 5. Return success and the necessary key material INCLUDING the raw key
             set({ isLoading: false, error: null });
             return {
                 success: true,
@@ -397,7 +400,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                     ivPwB64,
                     encKeyRecoveryB64,
                     ivRecoveryB64,
-                    recoveryKeyString // Pass this back to UI!
+                    recoveryKeyString, // Pass this back to UI!
+                    generatedSymmetricKey: symmetricKey // <-- Return the key object
                 }
             };
 
@@ -409,9 +413,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     /**
      * Stores the generated encryption keys in the database.
      * @param keyMaterial - The key material generated during signup.
+     * @param generatedKey - The generated symmetric key.
      * @returns An object with success: true if the keys are stored successfully, or success: false and an error message otherwise.
      */
-    storeGeneratedKeys: async (keyMaterial: KeyMaterial): Promise<{ success: boolean; error?: string }> => {
+    storeGeneratedKeys: async (
+        keyMaterial: KeyMaterial,
+        generatedKey: CryptoKey // <-- Accept the key
+    ): Promise<{ success: boolean; error?: string }> => {
         set({ isLoading: true, error: null });
         const supabase = createClient();
         const currentUser = get().user;
@@ -455,7 +463,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 }
 
                 console.log("Keys stored successfully in database.");
-                set({ isLoading: false, error: null });
+                // --- NEW: Set the decrypted key in state ---
+                set({ decryptedSymmetricKey: generatedKey, isLoading: false, error: null });
+                console.log("Decrypted key set in memory after signup.");
+                // --- End NEW ---
+
+                // Initialize encryption service immediately if needed
+                try {
+                    // Use the singleton directly
+                    await encryptionService.initialize(generatedKey);
+                    console.log("Encryption service initialized immediately after key storage.");
+                  } catch (initError) {
+                    console.error("Failed to initialize encryption service immediately:", initError);
+                    // This might not be fatal, but log it. The hook might retry later.
+                  }
+
                 return { success: true };
 
             } catch (error: any) {
@@ -472,14 +494,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 attempt++;
             }
         }
-
-        try {
-            // Use the singleton directly
-            await encryptionService.initialize(get().decryptedSymmetricKey!);
-          } catch (error) {
-            console.error("Failed to initialize encryption service during signup:", error);
-            // Non-fatal, user can still continue
-          }
 
         // Ensure a return statement outside the loop
         return handleAuthError(set, supabase, new Error("Failed to store encryption keys after all attempts."), "Failed to store encryption keys after all attempts.");

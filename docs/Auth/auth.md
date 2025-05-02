@@ -196,9 +196,9 @@ src/
 
 - `initializeAuth`: Checks for an existing session on app load and sets up a Supabase listener (`onAuthStateChange`) that automatically updates user/session state and crucially clears the `decryptedSymmetricKey` from memory on logout.
 
-- `signup`: Handles Supabase user registration. Client-side: generates salt, main symmetric key, recovery key string. Derives password & recovery wrapping keys. Encrypts the symmetric key twice (once with password key, once with recovery key). Returns encrypted data, salt, and the plaintext recovery key string (for the user to save).
+- `signup`: Handles Supabase user registration. Client-side: generates salt, main symmetric key, recovery key string. Derives password & recovery wrapping keys. Encrypts the symmetric key twice (once with password key, once with recovery key). Returns encrypted data, salt, the plaintext recovery key string (for the user to save), **and the raw generated symmetric `CryptoKey` object.**
 
-- `storeGeneratedKeys`: Takes the encrypted keys/salt/IVs from signup (after user confirmation) and saves them to the `user_keys` table in Supabase.
+- `storeGeneratedKeys`: Takes the encrypted keys/salt/IVs **and the raw symmetric `CryptoKey`** from signup (after user confirmation). Saves the encrypted data to the `user_keys` table in Supabase. **Crucially, it also immediately sets the provided raw symmetric `CryptoKey` into the `decryptedSymmetricKey` state in memory.**
 
 - `login`: Handles Supabase password authentication. Fetches the user's salt, password-encrypted key, and IV from the database. Client-side: re-derives the password wrapping key, decrypts the symmetric key, and stores the resulting `CryptoKey` in the `decryptedSymmetricKey` state (memory).
 
@@ -208,7 +208,7 @@ src/
 
 - `resetPasswordAndUpdateKeys`: (Requires `decryptedSymmetricKey` in memory). Updates the password in Supabase Auth. Client-side: Fetches the existing salt, derives a new wrapping key from the new password + existing salt, re-encrypts the symmetric key (from memory) using this new key. Updates only the password-related encrypted key (`enc_key_pw`) and IV (`iv_pw`) in the database, leaving the salt and recovery key data unchanged. Optionally updates the in-memory key for consistency.
 
-- Security: Ensures Supabase (or any server-side actor) cannot access the user's decrypted symmetric key, as the decryption password/recovery key is never sent to the server, and decryption happens only in the browser.
+- Security: Ensures Supabase (or any server-side actor) cannot access the user's decrypted symmetric key, as the decryption password/recovery key is never sent to the server, and decryption happens only in the browser. **The key is available in memory immediately after signup completion or successful login/recovery.**
 
 # File Breakdown: src/services/database.ts: Database Service
 
