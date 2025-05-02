@@ -185,7 +185,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             // First check if we have a user from the direct authentication request
             const { data: { user }, error } = await supabase.auth.getUser();
 
+            // If there's an error related to missing session/refresh token, this is normal for new visitors
+            // So we'll handle it quietly without showing errors to the user
             if (error) {
+                if (error.message?.includes("Auth session missing") || 
+                   error.message?.includes("Refresh Token Not Found") ||
+                   error.name === "AuthSessionMissingError") {
+                    // This is an expected case for users who haven't logged in yet
+                    console.log("No active session found - user not logged in");
+                    set({ user: null, session: null, isLoading: false, error: null });
+                    return;
+                }
+                
+                // For other types of errors, we'll log them as before
                 console.error("Error fetching auth user:", error);
                 set({ user: null, session: null, isLoading: false, error: "Failed to initialize session." });
                 return;
@@ -213,7 +225,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 set({ user: null, session: null, isLoading: false });
                 console.log("No user found.");
             }
-        } catch (error) {
+        } catch (error: any) {
+            // Check if this is a session-missing error, which is normal for new visitors
+            if (error.message?.includes("Auth session missing") || 
+                error.name === "AuthSessionMissingError") {
+                console.log("No active session found - user not logged in");
+                set({ user: null, session: null, isLoading: false, error: null });
+                return;
+            }
+            
             console.error("Error initializing auth:", error);
             set({ user: null, session: null, isLoading: false, error: "Failed to initialize session." });
         }
