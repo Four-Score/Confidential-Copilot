@@ -6,7 +6,7 @@ import {
   PDFExtractionResult 
 } from './pdfUtils';
 import { generateBatchEmbeddings, ChunkWithEmbedding } from './embeddingUtils';
-import { encryptText, encryptMetadata, encryptVector } from './encryptionUtils';
+import { encryptText, encryptMetadata, encryptVector } from '@/services/keyManagement';
 import { 
   initiateProcessingJob,
   updateProcessingProgress,

@@ -149,5 +149,68 @@ export const userDbService = {
         error: `Database error: ${error.message}` 
       };
     }
+  },
+  /**
+   * Fetch encrypted DCPE keys for a user from the database
+   */
+  async fetchUserDcpeKeys(userId: string): Promise<{ encrypted_dcpe_keys: string } | null> {
+    const supabase = createClient();
+
+    try {
+      const { data, error } = await supabase
+        .from('user_keys')
+        .select('encrypted_dcpe_keys')
+        .eq('user_id', userId)
+        .single();
+
+      if (error || !data?.encrypted_dcpe_keys) {
+        console.log('No DCPE keys found in database for user:', userId);
+        return null;
+      }
+
+      return {
+        encrypted_dcpe_keys: data.encrypted_dcpe_keys
+      };
+    } catch (error) {
+      console.error('Error fetching DCPE keys from database:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Store encrypted DCPE keys for a user in the database
+   */
+  async storeUserDcpeKeys(
+    userId: string,
+    encryptedDcpeKeys: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const supabase = createClient();
+
+    try {
+      const { error } = await supabase
+        .from('user_keys')
+        .update({
+          encrypted_dcpe_keys: encryptedDcpeKeys
+        })
+        .eq('user_id', userId);
+
+      if (error) {
+        return {
+          success: false,
+          error: `Error storing DCPE keys: ${error.message}`
+        };
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        error: `Exception storing DCPE keys: ${errorMessage}`
+      };
+    }
   }
 };
+
+
+

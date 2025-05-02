@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { processPdfFile, DocumentChunk } from './pdfUtils';
 import { generateBatchEmbeddings, ChunkWithEmbedding } from './embeddingUtils';
-import { encryptText, encryptMetadata, encryptVector } from './encryptionUtils';
+import { encryptText, encryptMetadata, encryptVector } from '@/services/keyManagement';
 
 /**
  * Status type for document processing

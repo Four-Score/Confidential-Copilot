@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { User, Session } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client'; // Use the browser client
 import { userDbService } from '@/services/database';
+import { keyManagementService } from '@/services/keyManagement'; // Import only the new key management service
 import {
     deriveKeyFromPassword,
     deriveKeyFromRecoveryString,
@@ -66,9 +67,13 @@ interface AuthState {
             encKeyRecoveryB64: string;
             ivRecoveryB64: string;
             recoveryKeyString: string; // The key to display to the user
+            generatedSymmetricKey: CryptoKey; // <-- Add the generated key
         } | null;
     }>;
-    storeGeneratedKeys: (keyMaterial: NonNullable<AuthState['signup']['prototype']['keyMaterial']>) => Promise<{ success: boolean; error?: string }>;
+    storeGeneratedKeys: (
+        keyMaterial: NonNullable<AuthState['signup']['prototype']['keyMaterial']>,
+        generatedKey: CryptoKey // <-- Add parameter for the key
+    ) => Promise<{ success: boolean; error?: string }>;
     logout: () => Promise<void>;
     recoverWithKey: (recoveryKeyData: RecoveryKeyData) => Promise<{ success: boolean; error?: string }>; // For use after recovery
     resetPasswordAndUpdateKeys: (newPassword: string) => Promise<{ success: boolean; error?: string }>; // For use after recovery or password change
@@ -292,6 +297,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             set({ decryptedSymmetricKey: symmetricKey, isLoading: false, error: null });
             console.log("Decrypted key stored in memory.");
 
+            // 8. Initialize the new key management service
+            try {
+                await keyManagementService.initialize(user.id, symmetricKey);
+                console.log("Key management service initialized.");
+            } catch (initError) {
+                console.error("Failed to initialize key management service:", initError);
+                // Non-fatal error, continue with login
+            }
+
             return { success: true };
 
         } catch (error: any) {
@@ -309,7 +323,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     signup: async (email: string, password: string): Promise<{
         success: boolean;
         error?: string;
-        keyMaterial?: KeyMaterial | null;
+        keyMaterial?: KeyMaterial & { generatedSymmetricKey: CryptoKey } | null; // <-- Update return type
         }> => {
         set({ isLoading: true, error: null });
         const supabase = createClient();
@@ -367,7 +381,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             console.log("Generating cryptographic keys...");
             const salt: Uint8Array = generateSalt();
             const passwordDerivedKey: CryptoKey = await deriveKeyFromPassword(password, salt);
-            const symmetricKey: CryptoKey = await generateRandomSymmetricKey();
+            const symmetricKey: CryptoKey = await generateRandomSymmetricKey(); // <-- Keep this key
             const recoveryKeyString: string = generateRecoveryKeyString(); // Generate the string for the user
             const recoveryDerivedKey: CryptoKey = await deriveKeyFromRecoveryString(recoveryKeyString, salt); // Use same salt
 
@@ -384,8 +398,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
             console.log("Keys generated and encrypted.");
 
-            // 5. Return success and the necessary key material
-            // The UI will display recoveryKeyString and call storeGeneratedKeys on confirmation
+            // 5. Return success and the necessary key material INCLUDING the raw key
             set({ isLoading: false, error: null });
             return {
                 success: true,
@@ -396,7 +409,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                     ivPwB64,
                     encKeyRecoveryB64,
                     ivRecoveryB64,
-                    recoveryKeyString // Pass this back to UI!
+                    recoveryKeyString, // Pass this back to UI!
+                    generatedSymmetricKey: symmetricKey // <-- Return the key object
                 }
             };
 
@@ -408,9 +422,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     /**
      * Stores the generated encryption keys in the database.
      * @param keyMaterial - The key material generated during signup.
+     * @param generatedKey - The generated symmetric key.
      * @returns An object with success: true if the keys are stored successfully, or success: false and an error message otherwise.
      */
-    storeGeneratedKeys: async (keyMaterial: KeyMaterial): Promise<{ success: boolean; error?: string }> => {
+    storeGeneratedKeys: async (
+        keyMaterial: KeyMaterial,
+        generatedKey: CryptoKey // <-- Accept the key
+    ): Promise<{ success: boolean; error?: string }> => {
         set({ isLoading: true, error: null });
         const supabase = createClient();
         const currentUser = get().user;
@@ -454,7 +472,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 }
 
                 console.log("Keys stored successfully in database.");
-                set({ isLoading: false, error: null });
+                // --- NEW: Set the decrypted key in state ---
+                set({ decryptedSymmetricKey: generatedKey, isLoading: false, error: null });
+                console.log("Decrypted key set in memory after signup.");
+                // --- End NEW ---
+
+                // Initialize the key management service with new keys immediately
+                try {
+                    // Use initializeWithNewKeys to generate fresh DCPE keys during signup
+                    await keyManagementService.initializeWithNewKeys(currentUser.id, generatedKey);
+                    console.log("Key management service initialized with new DCPE keys during signup.");
+                } catch (initError) {
+                    console.error("Failed to initialize key management service during signup:", initError);
+                    // This is non-fatal, but log it
+                }
+
                 return { success: true };
 
             } catch (error: any) {
@@ -548,6 +580,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             // 5. Store the decrypted key in state
             set({ decryptedSymmetricKey: symmetricKey, isLoading: false, error: null });
             console.log("Decrypted key stored in memory for password reset.");
+
+            // 6. Initialize the new key management service if user is available
+            const currentUser = get().user;
+            if (currentUser) {
+                try {
+                    await keyManagementService.initialize(currentUser.id, symmetricKey);
+                    console.log("Key management service initialized after key recovery.");
+                } catch (initError) {
+                    console.error("Failed to initialize key management service after recovery:", initError);
+                    // Non-fatal error, continue with recovery
+                }
+            }
 
             return { success: true };
 

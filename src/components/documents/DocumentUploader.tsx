@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { useAuthStore } from '@/store/authStore';
-import { useEncryptionService } from '@/lib/encryptionUtils';
+import { useKeyManagement } from '@/services/keyManagement';
 import { Document } from '@/types/document';
 import FileUploader from '@/components/uploads/FileUploader';
 import PDFPreview from '@/components/uploads/PDFPreview';
@@ -22,7 +22,7 @@ export default function DocumentUploader({
   const [file, setFile] = useState<File | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   
-  const { service: encryptionService } = useEncryptionService();
+  const { service: encryptionService } = useKeyManagement();
   const { 
     processFile, 
     isProcessing, 

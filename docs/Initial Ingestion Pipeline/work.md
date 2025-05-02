@@ -41,30 +41,40 @@ The schema includes indexes for performance and Row Level Security (RLS) policie
 (d) insert_document_with_chunks function:
 The provided SQL function `insert_document_with_chunks` is designed to atomically insert a document and its associated chunks into the database. It takes parameters such as `project_id`, `name`, `type`, `file_size`, `page_count`, `encrypted_content`, `encrypted_metadata`, and `chunks` (a JSON array). The function first inserts the document metadata into the `documents` table and then iterates through the `chunks` JSON array, inserting each chunk into the `vector_chunks` table. The function uses a transaction to ensure that either all operations succeed, or none do, and returns a JSON object indicating success or failure. It also grants execute permission to authenticated users.
 
-2. Implemented Encryption Utilities: (c:\Projects\Confidential-Copilot\src\lib\encryptionUtils.ts)
+2. Implemented Key Management Service: (c:\Projects\Confidential-Copilot\src\services\keyManagement)
 Key Implementation Details
 Key Management:
 
-The EncryptionService class integrates with your existing authentication system by using the symmetric key from authStore to encrypt the DCPE keys
-DCPE keys are generated once, then encrypted and stored in localStorage
-On subsequent sessions, the encrypted DCPE keys are retrieved and decrypted using the user's symmetric key
+The Key Management Service is a modular system designed to securely handle encryption keys with a clear separation of concerns through provider interfaces:
+  - KeyStorageProvider: For storing and retrieving encrypted keys
+  - CryptoProvider: For cryptographic operations
+  - DCPEProvider: For deterministic encryption functionality
+
+DCPE keys are stored in two locations for optimal performance and cross-device consistency:
+  - In the database (encrypted_dcpe_keys column in user_keys table) for persistence across devices
+  - In localStorage for faster access on the current device
+
+The Key Management Service follows a prioritized loading strategy:
+  1. First tries loading from database (primary source) for cross-device consistency
+  2. Then tries localStorage as a fallback for faster access
+  3. Generates new keys if neither source is available
+
+All DCPE keys are always encrypted with the user's symmetric key before storage
+
 Encryption Functions:
+  - encryptText: Standard encryption for document content
+  - encryptMetadata: Deterministic encryption for metadata (allows exact matching while encrypted)
+  - encryptVector: Specialized encryption for vector embeddings that preserves search capabilities
 
-encryptText: Standard encryption for document content
-encryptMetadata: Deterministic encryption for metadata (allows exact matching while encrypted)
-encryptVector: Specialized encryption for vector embeddings that preserves search capabilities
 React Integration:
+  - useKeyManagement hook provides a React-friendly way to access the encryption service
+  - Automatically initializes when the symmetric key is available
+  - Includes loading and error states for UI feedback
+  - Automatically clears encryption state on logout
 
-useEncryptionService hook provides a React-friendly way to access the encryption service
-Automatically initializes when the symmetric key is available
-Includes loading and error states for UI feedback
-Automatically clears encryption state on logout
 Standalone Utilities:
-
-Functions like encryptText, encryptMetadata, and encryptVector can be used outside React components
-Each function checks if the service is initialized and initializes it if needed
-
-- **Buffer Handling Enhancement**: The `decryptMetadata` function in `encryptionUtils.ts` has been improved to handle serialized Buffer objects that are returned from the database. It now properly detects and converts JSON Buffer representations (`{type:"Buffer", data:[...]}`) back to actual Buffer objects before decryption, ensuring compatibility with the DCPE library requirements.
+  - Functions like encryptText, encryptMetadata, and encryptVector can be used outside React components
+  - Each function checks if the service is initialized and initializes it if needed
 
 3. Created PDF Processing Utilities: (c:\Projects\Confidential-Copilot\src\lib\pdfUtils.ts)
 This file, pdfUtils.ts, provides utilities for processing PDF files. It includes functions to `validatePdfFile` by checking its type and size, `extractTextFromPdf` to extract text and metadata, `chunkText` to divide the extracted text into smaller chunks, and `processPdfFile` to perform the complete PDF processing pipeline. It also defines interfaces `PDFExtractionResult` and `DocumentChunk` to structure the extracted data and chunks. Constants like `MAX_FILE_SIZE`, `DEFAULT_CHUNK_SIZE`, and `DEFAULT_CHUNK_OVERLAP` define limits and default values for file processing.
@@ -125,7 +135,7 @@ This code defines a `GET` function in route.ts that serves as an API endpoint to
 This code defines a Next.js API endpoint (`POST` at `/api/documents/cancel/[jobId]`) to cancel a document processing job. It extracts the `jobId` from the URL parameters, initializes a Supabase client using `createClient()`, and verifies user authentication via `supabase.auth.getUser()`. Upon successful authentication, it sends a `POST` request to `/api/documents/progress` to update the job's status to 'cancelled'. The function returns a JSON response indicating success or failure, along with appropriate HTTP status codes. Error handling is included to catch and log any exceptions during the cancellation process.
 
 (d) Create a Client-Side Processing Utility: Confidential-Copilot\src\lib\processingUtils.ts
-This code defines a client-side document processing pipeline in processingUtils.ts for a React/TypeScript application. It includes functions to handle PDF processing, embedding generation, encryption, and interaction with a backend API. The `processPdfDocument` function orchestrates the entire process: it extracts text from a PDF using `processPdfFile`, generates embeddings using `generateBatchEmbeddings`, encrypts the data using functions from `encryptionUtils` (like `encryptText`, `encryptMetadata`, and `encryptVector`), and uploads the encrypted data to the server. Helper functions like `initiateProcessingJob`, `updateProcessingProgress`, and `cancelProcessingJob` manage the communication with the backend to track and control the processing job. The code also defines types and interfaces such as `ProcessingStatus`, `ProcessingProgressEvent`, and `ProcessingOptions` to manage the state and configuration of the document processing pipeline.
+This code defines a client-side document processing pipeline in processingUtils.ts for a React/TypeScript application. It includes functions to handle PDF processing, embedding generation, encryption, and interaction with a backend API. The `processPdfDocument` function orchestrates the entire process: it extracts text from a PDF using `processPdfFile`, generates embeddings using `generateBatchEmbeddings`, encrypts the data using functions from the Key Management Service (like `encryptText`, `encryptMetadata`, and `encryptVector`), and uploads the encrypted data to the server. Helper functions like `initiateProcessingJob`, `updateProcessingProgress`, and `cancelProcessingJob` manage the communication with the backend to track and control the processing job. The code also defines types and interfaces such as `ProcessingStatus`, `ProcessingProgressEvent`, and `ProcessingOptions` to manage the state and configuration of the document processing pipeline.
 Implementation Notes:
 Zero-Trust Processing Model:
 - All document processing happens client-side
@@ -176,7 +186,7 @@ The `DashboardPage` component now serves as the main landing page for authentica
 
 3. Project Page Implementation
 (a) Project Page Component: Confidential-Copilot\src\app\projects\[id]\page.tsx
-The `ProjectPage` component fetches and displays project details and documents. It uses `fetchProjectData` to retrieve data, handles document uploads with `handleUploadComplete`, and manages document deletion with `handleDeleteDocument`. It also decrypts document names using the `encryptionService` when available. The component has been updated to correctly handle the API response structure for project data.
+The `ProjectPage` component fetches and displays project details and documents. It uses `fetchProjectData` to retrieve data, handles document uploads with `handleUploadComplete`, and manages document deletion with `handleDeleteDocument`. It also decrypts document names using the Key Management Service when available. The component has been updated to correctly handle the API response structure for project data.
 
 (b) Document Type Definition: Confidential-Copilot\src\types\document.ts
 The code defines a TypeScript interface `Document` representing a document's structure, including fields like `id`, `project_id`, `name`, `type`, `upload_date`, `file_size`, `page_count`, and `encrypted_metadata`.
@@ -207,7 +217,7 @@ This React functional component, `ErrorDisplay`, takes an error message and an o
 This React component, `PDFPreview`, generates a preview of a PDF file using a blob URL, displays it in an `<object>` element, and provides a fallback message with a link if the preview fails, while cleaning up the blob URL on unmount.
 
 (e) Document Uploader Component: Confidential-Copilot\src\components\documents\DocumentUploader.tsx
-DocumentUploader.tsx is a React component that handles the uploading and processing of documents, specifically PDFs, in a secure manner. It uses several custom hooks and components to achieve this: `useEncryptionService` for encryption, `useDocumentProcessor` for handling the file processing pipeline, `FileUploader` for the drag-and-drop file selection, and `PDFPreview` for displaying a preview of the selected PDF. The component manages the file selection via `handleFileSelect`, initiates the upload process with `startUpload` which calls `processFile` from the `useDocumentProcessor` hook, and allows canceling the upload via `handleCancelUpload`. It also displays progress and status updates during the upload and processing stages, ensuring a secure, client-side processing workflow.
+DocumentUploader.tsx is a React component that handles the uploading and processing of documents, specifically PDFs, in a secure manner. It uses several custom hooks and components to achieve this: `useKeyManagement` for encryption, `useDocumentProcessor` for handling the file processing pipeline, `FileUploader` for the drag-and-drop file selection, and `PDFPreview` for displaying a preview of the selected PDF. The component manages the file selection via `handleFileSelect`, initiates the upload process with `startUpload` which calls `processFile` from the `useDocumentProcessor` hook, and allows canceling the upload via `handleCancelUpload`. It also displays progress and status updates during the upload and processing stages, ensuring a secure, client-side processing workflow.
 
 ## Client-Side Processing 
 
@@ -216,7 +226,7 @@ DocumentUploader.tsx is a React component that handles the uploading and process
 This code defines a configuration interface `PDFProcessingConfig` for PDF processing, provides a default configuration, and a function to override the default configuration with user-provided values.
 
 (b) Create a Comprehensive Client-Side Processing Module: Confidential-Copilot\src\lib\clientProcessing.ts
-This code defines a client-side document processing pipeline using TypeScript. The `processDocument` function orchestrates the process of taking a PDF file, extracting its text and metadata using `processPdfFile`, generating embeddings for the text chunks using `generateBatchEmbeddings`, encrypting the content, metadata, and embeddings using functions from `encryptionUtils`, and then uploading the encrypted data to a server. It also handles progress updates via `initiateProcessingJob` and `updateProcessingProgress`, and manages errors and cancellations, providing a `ProcessingResult` indicating success or failure. The processing is configured using `PDFProcessingConfig` and `DocumentProcessingOptions`.
+This code defines a client-side document processing pipeline using TypeScript. The `processDocument` function orchestrates the process of taking a PDF file, extracting its text and metadata using `processPdfFile`, generating embeddings for the text chunks using `generateBatchEmbeddings`, encrypting the content, metadata, and embeddings using functions from the Key Management Service, and then uploading the encrypted data to a server. It also handles progress updates via `initiateProcessingJob` and `updateProcessingProgress`, and manages errors and cancellations, providing a `ProcessingResult` indicating success or failure. The processing is configured using `PDFProcessingConfig` and `DocumentProcessingOptions`.
 
 (c) Create a Custom Hook for Client-Side Processing: Confidential-Copilot\src\hooks\useDocumentProcessor.ts
 The `useDocumentProcessor` hook manages the document processing workflow. It uses `useState` to track the processing status, progress, errors, and `symmetricKey` from `useAuthStore`. The `processFile` function is the core logic, taking a `projectId` and a `File` object as input. It calls `processDocument` to handle the actual processing, which includes validation, text extraction using `processPdfFile`, embedding generation using `generateBatchEmbeddings`, encryption, and uploading to the server. Throughout the process, `reportProgress` updates the UI, and error handling ensures that failures are caught and reported.
