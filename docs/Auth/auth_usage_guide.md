@@ -101,12 +101,36 @@ This guide provides practical information for developers working with the authen
     -   These keys are stored in both the database (`encrypted_dcpe_keys` column in `user_keys` table) and localStorage.
     -   Database storage ensures consistency across devices, while localStorage provides faster access.
     -   Keys are always encrypted with the user's symmetric key before storage.
-    -   The `EncryptionService` manages the loading priority: first from database, then from localStorage, finally generating new keys if neither exists.
+    -   The Key Management Service manages the loading priority: first from database, then from localStorage, finally generating new keys if neither exists.
 
--   **Encryption/Decryption:**
-    -   Use the functions in `src/lib/crypto.ts` for all cryptographic operations.
-    -   Use methods from `encryptionService` for all DCPE operations.
-    -   Ensure that you handle errors and loading states appropriately.
+-   **Using the Key Management Service:**
+    -   Access the Key Management Service using the `useKeyManagement` hook:
+    
+    ```typescript
+    import { useKeyManagement } from '@/services/keyManagement';
+    
+    function MyComponent() {
+      const { service, isLoading, error } = useKeyManagement();
+      
+      // Use the service to perform encryption/decryption operations
+      if (isLoading) return <div>Loading encryption service...</div>;
+      if (error) return <div>Error: {error}</div>;
+      if (service) {
+        const encryptedText = service.encryptText('Secret message');
+        const decryptedText = service.decryptText(encryptedText);
+      }
+    }
+    ```
+    
+    -   For non-React code, use the standalone utility functions:
+    
+    ```typescript
+    import { encryptText, encryptMetadata, encryptVector } from '@/services/keyManagement';
+    
+    // Inside an async function
+    const symmetricKey = useAuthStore.getState().decryptedSymmetricKey;
+    const encryptedText = await encryptText('Secret message', symmetricKey);
+    ```
 
 ### 4. Error Handling
 

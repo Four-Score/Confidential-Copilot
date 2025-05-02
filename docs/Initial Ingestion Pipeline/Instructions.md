@@ -51,12 +51,12 @@ Key steps:
 2. **Text Extraction**: Extract text from the document (`processPdfFile` in pdfUtils.ts)
 3. **Chunking**: Split text into manageable chunks (`chunkText` in pdfUtils.ts)
 4. **Embedding Generation**: Create vector embeddings for each chunk (`generateBatchEmbeddings` in embeddingUtils.ts)
-5. **Encryption**: Encrypt document content, metadata, and embeddings (`encryptionUtils.ts`)
+5. **Encryption**: Encrypt document content, metadata, and embeddings using the Key Management Service
 6. **Upload**: Send encrypted data to server
 
 ### 3. Encryption Process
 
-The encryption utilities in encryptionUtils.ts provide three critical functions:
+The Key Management Service provides three critical functions:
 
 1. `encryptText`: Standard encryption for document content
 2. `encryptMetadata`: Deterministic encryption for metadata (enables exact matching)
@@ -86,9 +86,9 @@ To ensure deterministic encryption works consistently across multiple devices, w
    - **LocalStorage**: Keys are also cached in browser localStorage for faster access on the same device
 
 2. **Prioritized Loading**:
-   - When a user logs in, the system attempts to load DCPE keys in this order:
+   - When a user logs in, the Key Management Service attempts to load DCPE keys in this order:
      1. First from database (primary source for cross-device consistency)
-     2. Then from localStorage (fallback for backward compatibility)
+     2. Then from localStorage (fallback for faster access)
      3. If neither exists, new keys are generated and stored in both locations
 
 3. **Secure Encryption**:
@@ -97,8 +97,9 @@ To ensure deterministic encryption works consistently across multiple devices, w
    - This maintains our zero-trust approach while enabling cross-device functionality
 
 4. **Initialization Process**:
-   - The EncryptionService's `initialize()` method in encryptionUtils.ts manages the loading and persistence of DCPE keys
-   - `syncKeysToDatabase()` ensures keys are properly stored in the database
+   - The Key Management Service's `initialize()` method manages the loading and persistence of DCPE keys
+   - The `initializeWithNewKeys()` method ensures keys are properly generated during signup
+   - Cross-storage synchronization ensures consistency between database and localStorage
 
 ### Why This Matters
 
@@ -149,7 +150,7 @@ Modify clientProcessing.ts to handle your data type, or create a specialized ver
 
 The following components can be reused without modification:
 
-- Encryption utilities (`encryptionUtils.ts`)
+- Key Management Service (`services/keyManagement`)
 - Embedding generation (`embeddingUtils.ts`)
 - Progress tracking (`processingUtils.ts`)
 - Upload and storage API endpoints
@@ -158,10 +159,14 @@ The following components can be reused without modification:
 
 ### Core Utilities
 
-1. **Encryption Utilities**
-   - File: encryptionUtils.ts
-   - Key Functions: `encryptText`, `encryptMetadata`, `encryptVector`, `decryptMetadata`
-   - Hook: `useEncryptionService`
+1. **Key Management Service**
+   - Path: `src/services/keyManagement`
+   - Key Components:
+     - `KeyManagementService.ts`: Main service class
+     - `interfaces.ts`: Provider interfaces for storage, crypto, and DCPE operations
+     - `index.ts`: Exports service singleton and utility functions
+   - Hook: `useKeyManagement`
+   - Functions: `encryptText`, `encryptMetadata`, `encryptVector`, `decryptText`, `decryptMetadata`
 
 2. **PDF Processing Utilities**
    - File: pdfUtils.ts
@@ -222,7 +227,7 @@ To add email support:
 1. Create `emailUtils.ts` with functions to parse email structure and extract content
 2. Extend `DocumentUploader` to accept `.eml` files
 3. Create chunking logic that respects email structure (headers, body, attachments)
-4. Reuse `encryptText`, `encryptMetadata`, and `generateBatchEmbeddings` functions
+4. Reuse the Key Management Service's `encryptText`, `encryptMetadata`, and `generateBatchEmbeddings` functions
 5. Update type definitions to include email-specific metadata
 
 ## Conclusion
