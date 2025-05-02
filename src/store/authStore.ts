@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { User, Session } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client'; // Use the browser client
 import { userDbService } from '@/services/database';
-import { encryptionService } from '@/lib/encryptionUtils';
+import { keyManagementService } from '@/services/keyManagement'; // Import only the new key management service
 import {
     deriveKeyFromPassword,
     deriveKeyFromRecoveryString,
@@ -297,6 +297,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             set({ decryptedSymmetricKey: symmetricKey, isLoading: false, error: null });
             console.log("Decrypted key stored in memory.");
 
+            // 8. Initialize the new key management service
+            try {
+                await keyManagementService.initialize(user.id, symmetricKey);
+                console.log("Key management service initialized.");
+            } catch (initError) {
+                console.error("Failed to initialize key management service:", initError);
+                // Non-fatal error, continue with login
+            }
+
             return { success: true };
 
         } catch (error: any) {
@@ -468,15 +477,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 console.log("Decrypted key set in memory after signup.");
                 // --- End NEW ---
 
-                // Initialize encryption service immediately if needed
+                // Initialize the key management service with new keys immediately
                 try {
-                    // Use the singleton directly
-                    await encryptionService.initialize(generatedKey);
-                    console.log("Encryption service initialized immediately after key storage.");
-                  } catch (initError) {
-                    console.error("Failed to initialize encryption service immediately:", initError);
-                    // This might not be fatal, but log it. The hook might retry later.
-                  }
+                    // Use initializeWithNewKeys to generate fresh DCPE keys during signup
+                    await keyManagementService.initializeWithNewKeys(currentUser.id, generatedKey);
+                    console.log("Key management service initialized with new DCPE keys during signup.");
+                } catch (initError) {
+                    console.error("Failed to initialize key management service during signup:", initError);
+                    // This is non-fatal, but log it
+                }
 
                 return { success: true };
 
@@ -571,6 +580,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             // 5. Store the decrypted key in state
             set({ decryptedSymmetricKey: symmetricKey, isLoading: false, error: null });
             console.log("Decrypted key stored in memory for password reset.");
+
+            // 6. Initialize the new key management service if user is available
+            const currentUser = get().user;
+            if (currentUser) {
+                try {
+                    await keyManagementService.initialize(currentUser.id, symmetricKey);
+                    console.log("Key management service initialized after key recovery.");
+                } catch (initError) {
+                    console.error("Failed to initialize key management service after recovery:", initError);
+                    // Non-fatal error, continue with recovery
+                }
+            }
 
             return { success: true };
 

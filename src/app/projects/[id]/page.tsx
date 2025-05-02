@@ -7,7 +7,7 @@ import DocumentList from '@/components/documents/DocumentList';
 import DocumentUploader from '@/components/documents/DocumentUploader';
 import { Project } from '@/types/project';
 import { Document } from '@/types/document';
-import { useEncryptionService } from '@/lib/encryptionUtils';
+import { useKeyManagement } from '@/services/keyManagement';
 
 export default function ProjectPage() {
   const params = useParams();
@@ -19,7 +19,7 @@ export default function ProjectPage() {
   const [error, setError] = useState<string | null>(null);
   
   // Get encryption service
-  const { service: encryptionService, isLoading: isEncryptionLoading } = useEncryptionService();
+  const { service: encryptionService, isLoading: isEncryptionLoading } = useKeyManagement();
   
   // Fetch project and documents when component mounts
   useEffect(() => {
