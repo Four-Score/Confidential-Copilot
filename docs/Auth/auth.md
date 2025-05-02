@@ -9,6 +9,7 @@ This authentication system is designed with security by design and zero-trust pr
 - Symmetric Key: A randomly generated key used to encrypt and decrypt user data. This key is never stored in plaintext on the server.
 - Password-Derived Key: A key derived from the user's password using a strong key derivation function (KDF) like PBKDF2. This key is used to encrypt the symmetric key.
 - Recovery Key: A randomly generated key displayed to the user during signup. This key is used as a backup to decrypt the symmetric key if the user forgets their password.
+- DCPE Keys: A set of keys used for Deterministic Convergent Privacy Encryption, which enables searchable encryption while maintaining security. These keys are encrypted with the user's symmetric key and stored in both the database and localStorage for cross-device consistency.
 - Salt: A random value used to protect against rainbow table attacks.
 - Initialization Vector (IV): A random value used to ensure that the same plaintext encrypts to different ciphertexts.
 

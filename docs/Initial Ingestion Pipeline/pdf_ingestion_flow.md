@@ -104,7 +104,15 @@ This analysis traces the complete data flow of a PDF document from initial uploa
    }
    ```
 
-2. Encryption operations (using functions from encryptionUtils.ts):
+2. EncryptionService initialization and key handling:
+   - DCPE keys are loaded:
+     1. First attempted from database (`encrypted_dcpe_keys` column) for cross-device consistency
+     2. Then from localStorage as a fallback
+     3. Generated new if neither exists
+   - DCPE keys are always encrypted with the user's symmetric key before storage
+   - After loading/generation, they are used for all deterministic encryption operations
+
+3. Encryption operations (using functions from encryptionUtils.ts):
    - Document name: `encryptedName = await encryptMetadata(file.name, symmetricKey)` → string
    - Metadata fields:
      ```typescript
@@ -130,7 +138,7 @@ This analysis traces the complete data flow of a PDF document from initial uploa
      }
      ```
 
-3. Progress reporting: `reportProgress('encrypting', progressValue, 'Encrypting chunk x/y')`
+4. Progress reporting: `reportProgress('encrypting', progressValue, 'Encrypting chunk x/y')`
 
 ### Upload to Server
 1. Prepares upload payload:

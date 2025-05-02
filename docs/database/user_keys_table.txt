@@ -8,6 +8,8 @@ CREATE TABLE public.user_keys (
     -- Encrypted symmetric key (using recovery key)
     enc_key_recovery TEXT NOT NULL,
     iv_recovery TEXT NOT NULL,
+    -- Encrypted DCPE keys (for cross-device persistence)
+    encrypted_dcpe_keys TEXT,
     -- Salt used for PBKDF2 password key derivation
     salt TEXT NOT NULL,
     -- Timestamps

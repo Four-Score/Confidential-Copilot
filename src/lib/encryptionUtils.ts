@@ -2,6 +2,7 @@ import { DCPE } from 'dcpe-js';
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { arrayBufferToBase64, base64ToArrayBuffer } from './crypto';
+import { createClient } from '@/lib/supabase/client';
 
 /**
  * Encryption service for secure document storage and retrieval.
@@ -29,39 +30,123 @@ export class EncryptionService {
       this.symmetricKey = symmetricKey;
       this.dcpe = new DCPE();
       
-      // Check if we have stored DCPE keys
-      const storedKeys = localStorage.getItem('encrypted_dcpe_keys');
+      // Get current user ID
+      const supabase = createClient();
+      const { data } = await supabase.auth.getUser();
+      const userId = data.user?.id;
       
-      if (storedKeys) {
-        // Decrypt and use stored keys
+      if (!userId) {
+        console.error("User ID not available for DCPE key storage");
+        return false;
+      }
+      
+      // Try loading DCPE keys in order of preference
+      let dcpeKeysLoaded = false;
+      
+      // 1. First try to get keys from database
+      if (!dcpeKeysLoaded) {
         try {
-          const decryptedKeys = await this.decryptWithSymmetricKey(storedKeys);
-          const parsedKeys = JSON.parse(decryptedKeys);
-          this.dcpe.setKeys(parsedKeys);
-          this.dcpeKeysString = decryptedKeys;
-          this.initialized = true;
-          return true;
+          const { data: keyData, error } = await supabase
+            .from('user_keys')
+            .select('encrypted_dcpe_keys')
+            .eq('user_id', userId)
+            .single();
+            
+          if (!error && keyData && keyData.encrypted_dcpe_keys) {
+            // Decrypt and use stored keys from database
+            const decryptedKeys = await this.decryptWithSymmetricKey(keyData.encrypted_dcpe_keys);
+            const parsedKeys = JSON.parse(decryptedKeys);
+            this.dcpe.setKeys(parsedKeys);
+            this.dcpeKeysString = decryptedKeys;
+            
+            // Update localStorage for faster access next time
+            localStorage.setItem('encrypted_dcpe_keys', keyData.encrypted_dcpe_keys);
+            
+            console.log("Successfully loaded DCPE keys from database");
+            this.initialized = true;
+            dcpeKeysLoaded = true;
+          }
         } catch (error) {
-          console.error("Failed to load stored DCPE keys, generating new ones:", error);
-          // Fall through to key generation
+          console.error("Failed to load DCPE keys from database:", error);
+          // Continue to next source
         }
       }
       
-      // Generate new DCPE keys
-      const keys = await this.dcpe.generateKeys();
-      this.dcpe.setKeys(keys);
+      // 2. Try localStorage if database failed
+      if (!dcpeKeysLoaded) {
+        const storedKeys = localStorage.getItem('encrypted_dcpe_keys');
+        
+        if (storedKeys) {
+          try {
+            // Decrypt and use stored keys
+            const decryptedKeys = await this.decryptWithSymmetricKey(storedKeys);
+            const parsedKeys = JSON.parse(decryptedKeys);
+            this.dcpe.setKeys(parsedKeys);
+            this.dcpeKeysString = decryptedKeys;
+            
+            // Sync to database for future sessions on other devices
+            await this.syncKeysToDatabase(userId, storedKeys);
+            
+            console.log("Successfully loaded DCPE keys from localStorage and synced to database");
+            this.initialized = true;
+            dcpeKeysLoaded = true;
+          } catch (error) {
+            console.error("Failed to load stored DCPE keys from localStorage:", error);
+            // Continue to key generation
+          }
+        }
+      }
       
-      // Store the keys securely
-      this.dcpeKeysString = JSON.stringify(keys);
-      const encryptedKeys = await this.encryptWithSymmetricKey(this.dcpeKeysString);
-      localStorage.setItem('encrypted_dcpe_keys', encryptedKeys);
+      // 3. Generate new keys if all else fails
+      if (!dcpeKeysLoaded) {
+        console.log("Generating new DCPE keys");
+        const keys = await this.dcpe.generateKeys();
+        this.dcpe.setKeys(keys);
+        
+        // Store the keys securely
+        this.dcpeKeysString = JSON.stringify(keys);
+        const encryptedKeys = await this.encryptWithSymmetricKey(this.dcpeKeysString);
+        
+        // Store in localStorage for faster access
+        localStorage.setItem('encrypted_dcpe_keys', encryptedKeys);
+        
+        // Store in database for cross-device access
+        await this.syncKeysToDatabase(userId, encryptedKeys);
+        
+        this.initialized = true;
+      }
       
-      this.initialized = true;
       return true;
     } catch (error) {
       console.error("Failed to initialize encryption service:", error);
       this.initialized = false;
       return false;
+    }
+  }
+  
+  /**
+   * Syncs DCPE keys to the database for persistence across devices
+   * @param userId The current user ID
+   * @param encryptedKeys The encrypted DCPE keys
+   */
+  private async syncKeysToDatabase(userId: string, encryptedKeys: string): Promise<void> {
+    try {
+      const supabase = createClient();
+      
+      const { error } = await supabase
+        .from('user_keys')
+        .update({
+          encrypted_dcpe_keys: encryptedKeys
+        })
+        .eq('user_id', userId);
+        
+      if (error) {
+        console.error("Failed to sync DCPE keys to database:", error);
+      } else {
+        console.log("Successfully synced DCPE keys to database");
+      }
+    } catch (error) {
+      console.error("Exception syncing DCPE keys to database:", error);
     }
   }
 
@@ -273,6 +358,8 @@ export class EncryptionService {
     this.dcpeKeysString = null;
     this.initialized = false;
     localStorage.removeItem('encrypted_dcpe_keys');
+    // Note: We don't remove keys from the database during logout
+    // to ensure they're available for future sessions
   }
 }
 

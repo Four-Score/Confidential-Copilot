@@ -11,7 +11,8 @@ Our ingestion pipeline is built on:
 1. **Zero-Trust Architecture**: No unencrypted user data ever leaves the client
 2. **Client-Side Processing**: All extraction, chunking, embedding, and encryption happens in the browser
 3. **End-to-End Encryption**: Data is encrypted before storage and only decrypted on the client
-4. **Modular Design**: Components can be reused and extended for different data types
+4. **Cross-Device Consistency**: Encryption keys are securely stored for access across multiple devices
+5. **Modular Design**: Components can be reused and extended for different data types
 
 ## High-Level Data Flow
 
@@ -26,6 +27,7 @@ We use three main tables in Supabase:
 1. **Projects Table**: Organizes user content into projects
 2. **Documents Table**: Stores encrypted document metadata and content
 3. **Vector Chunks Table**: Stores encrypted text chunks and their vector embeddings
+4. **User Keys Table**: Stores encrypted symmetric keys and DCPE keys for secure cross-device access
 
 ## Detailed Pipeline Flow
 
@@ -72,6 +74,40 @@ API endpoints handle the secure storage of data:
 1. `ProjectPage` component fetches documents and decrypts names
 2. Documents are displayed via `DocumentList` and `DocumentCard` components
 3. Buffer serialization handling ensures proper decryption of data
+
+## DCPE Key Persistence Mechanism
+
+To ensure deterministic encryption works consistently across multiple devices, we've implemented a robust DCPE key persistence mechanism:
+
+### How It Works
+
+1. **Dual Storage Strategy**:
+   - **Database Storage**: Encrypted DCPE keys are stored in the `encrypted_dcpe_keys` column of the `user_keys` table
+   - **LocalStorage**: Keys are also cached in browser localStorage for faster access on the same device
+
+2. **Prioritized Loading**:
+   - When a user logs in, the system attempts to load DCPE keys in this order:
+     1. First from database (primary source for cross-device consistency)
+     2. Then from localStorage (fallback for backward compatibility)
+     3. If neither exists, new keys are generated and stored in both locations
+
+3. **Secure Encryption**:
+   - DCPE keys are always encrypted with the user's symmetric key before storage
+   - The symmetric key is only available in memory after successful authentication
+   - This maintains our zero-trust approach while enabling cross-device functionality
+
+4. **Initialization Process**:
+   - The EncryptionService's `initialize()` method in encryptionUtils.ts manages the loading and persistence of DCPE keys
+   - `syncKeysToDatabase()` ensures keys are properly stored in the database
+
+### Why This Matters
+
+Without this mechanism, deterministic encryption would produce different results on different devices, breaking:
+- Document name searches
+- Metadata filtering
+- Any features relying on exact-match queries on encrypted data
+
+This approach ensures that a document encrypted on one device can be properly decrypted and searched on another device, while maintaining zero-knowledge principles.
 
 ## How to Extend for New Data Types
 

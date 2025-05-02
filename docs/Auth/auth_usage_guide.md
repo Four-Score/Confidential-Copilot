@@ -96,8 +96,16 @@ This guide provides practical information for developers working with the authen
     -   Access it using `useAuthStore((state) => state.decryptedSymmetricKey)`.
     -   **Important:** This key is only available after successful login or recovery and is cleared on logout.
 
+-   **DCPE Keys:**
+    -   Deterministic Convergent Privacy Encryption (DCPE) keys are used for deterministic encryption of metadata.
+    -   These keys are stored in both the database (`encrypted_dcpe_keys` column in `user_keys` table) and localStorage.
+    -   Database storage ensures consistency across devices, while localStorage provides faster access.
+    -   Keys are always encrypted with the user's symmetric key before storage.
+    -   The `EncryptionService` manages the loading priority: first from database, then from localStorage, finally generating new keys if neither exists.
+
 -   **Encryption/Decryption:**
     -   Use the functions in `src/lib/crypto.ts` for all cryptographic operations.
+    -   Use methods from `encryptionService` for all DCPE operations.
     -   Ensure that you handle errors and loading states appropriately.
 
 ### 4. Error Handling

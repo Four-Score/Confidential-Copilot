@@ -46,8 +46,14 @@ Key Implementation Details
 Key Management:
 
 The EncryptionService class integrates with your existing authentication system by using the symmetric key from authStore to encrypt the DCPE keys
-DCPE keys are generated once, then encrypted and stored in localStorage
-On subsequent sessions, the encrypted DCPE keys are retrieved and decrypted using the user's symmetric key
+DCPE keys are stored in two locations for optimal performance and cross-device consistency:
+  - In the database (encrypted_dcpe_keys column in user_keys table) for persistence across devices
+  - In localStorage for faster access on the current device
+The EncryptionService follows a prioritized loading strategy:
+  1. First tries loading from database (primary source) for cross-device consistency
+  2. Then tries localStorage as a fallback for backward compatibility
+  3. Generates new keys if neither source is available
+All DCPE keys are always encrypted with the user's symmetric key before storage
 Encryption Functions:
 
 encryptText: Standard encryption for document content

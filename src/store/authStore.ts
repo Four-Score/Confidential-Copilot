@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { User, Session } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client'; // Use the browser client
 import { userDbService } from '@/services/database';
+import { encryptionService } from '@/lib/encryptionUtils';
 import {
     deriveKeyFromPassword,
     deriveKeyFromRecoveryString,
@@ -471,6 +472,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 attempt++;
             }
         }
+
+        try {
+            // Use the singleton directly
+            await encryptionService.initialize(get().decryptedSymmetricKey!);
+          } catch (error) {
+            console.error("Failed to initialize encryption service during signup:", error);
+            // Non-fatal, user can still continue
+          }
 
         // Ensure a return statement outside the loop
         return handleAuthError(set, supabase, new Error("Failed to store encryption keys after all attempts."), "Failed to store encryption keys after all attempts.");
