@@ -1,4 +1,5 @@
 // src/services/LLMService.ts
+import { config } from '../config';
 
 export interface GenerateOptions {
     tone: string;
@@ -33,7 +34,7 @@ export interface GenerateOptions {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer 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`, // Replace with your actual key
+          uthorization: `Bearer ${config.env.GROQ_API_KEY}`, // Replace with your actual key
         },
         body: JSON.stringify({
           model: "llama3-70b-8192",
