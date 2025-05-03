@@ -1,7 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import './styles.css';
+import { createClient } from '@supabase/supabase-js';
 
+const supabase = createClient(
+  'https://tczdnhbosuoqmgkpqnaz.supabase.co'
+  ,'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRjemRuaGJvc3VvcW1na3BxbmF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM2NzUwMDAsImV4cCI6MjA1OTI1MTAwMH0.RCg2REt0dl56FxPuTE6E2pEpt_uf5i9V8sngHwwt9Bc'
+
+);
 const PopupApp: React.FC = () => {
   const [status, setStatus] = useState<string>('Initializing...');
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -38,13 +44,31 @@ const PopupApp: React.FC = () => {
   };
 
   const handleTestAuth = () => {
-    chrome.runtime.sendMessage({ action: 'getAuthToken' }, (res) => {
-      if (res?.success) {
-        setAuthStatus(`✅ Token received`);
-        console.log("Token:", res.token);
+    chrome.storage.local.get('supabaseSession', async ({ supabaseSession }) => {
+      if (!supabaseSession) {
+        setAuthStatus('❌ No session found in storage');
+        return;
+      }
+  
+      const { access_token, refresh_token } = supabaseSession;
+  
+      const { data, error } = await supabase.auth.setSession({
+        access_token,
+        refresh_token,
+      });
+  
+      if (error) {
+        setAuthStatus(`❌ Failed to set session: ${error.message}`);
+        return;
+      }
+  
+      const result = await supabase.auth.getUser();
+  
+      if (result.error) {
+        setAuthStatus(`❌ Failed to get user: ${result.error.message}`);
       } else {
-        setAuthStatus(`❌ Auth failed: ${res?.error?.message || res?.error || 'Unknown error'}`);
-        console.error("Token error:", res?.error);
+        setAuthStatus(`✅ Logged in as: ${result.data.user?.email}`);
+        console.log('User:', result.data.user);
       }
     });
   };

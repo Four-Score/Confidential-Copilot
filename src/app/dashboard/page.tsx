@@ -115,8 +115,11 @@ export default function DashboardPage() {
                                 <span className="text-xs mt-1">Chat mode</span>
                             </div>
                             <div className="flex flex-col items-center">
-                                <div className="text-xl">✉️</div>
-                                <span className="text-xs mt-1">Email mode</span>
+                            <div
+                            onClick={() => router.push('/dashboard/email-summarizer')}
+                            className="text-xl cursor-pointer hover:text-blue-600 transition-colors"
+                            title="Email Mode">✉️</div>
+                            <span className="text-xs mt-1">Email mode</span>
                             </div>
                             <div className="flex flex-col items-center">
                                 <div className="text-xl">🧭</div>

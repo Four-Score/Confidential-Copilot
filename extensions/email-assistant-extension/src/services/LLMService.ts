@@ -34,8 +34,8 @@ export interface GenerateOptions {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          uthorization: `Bearer ${config.env.GROQ_API_KEY}`, // Replace with your actual key
-        },
+          'Authorization': `Bearer ${config.env.GROQ_API_KEY}`, // ✅ Fixed
+        },        
         body: JSON.stringify({
           model: "llama3-70b-8192",
           messages: [

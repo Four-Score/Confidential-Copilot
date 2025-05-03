@@ -1,4 +1,11 @@
 // Background script for the Email Assistant extension
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  'https://tczdnhbosuoqmgkpqnaz.supabase.co'
+  ,'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRjemRuaGJvc3VvcW1na3BxbmF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM2NzUwMDAsImV4cCI6MjA1OTI1MTAwMH0.RCg2REt0dl56FxPuTE6E2pEpt_uf5i9V8sngHwwt9Bc'
+
+);
 chrome.runtime.onInstalled.addListener(() => {
   console.log('Email Assistant extension installed');
   chrome.storage.local.get(['email_assistant_emails'], (result) => {
@@ -125,6 +132,13 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       target: { tabId },
       files: ['content.js']
     }).catch(err => console.error('Error injecting content script:', err));
+  }
+});
+chrome.storage.local.get(['supabaseSession'], async ({ supabaseSession }) => {
+  if (supabaseSession?.access_token && supabaseSession?.refresh_token) {
+    await supabase.auth.setSession(supabaseSession);
+    const user = await supabase.auth.getUser();
+    console.log('Logged in user:', user.data.user);
   }
 });
 

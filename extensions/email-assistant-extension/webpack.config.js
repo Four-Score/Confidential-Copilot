@@ -1,14 +1,15 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyPlugin = require('copy-webpack-plugin');
-const { CleanWebpackPlugin } = require('clean-webpack-plugin'); // ✅ Add this line
+const { CleanWebpackPlugin } = require('clean-webpack-plugin');
+const webpack = require('webpack'); // ✅ Add this line
 
 module.exports = {
   mode: 'development',
   entry: {
     popup: './src/popup.tsx',
     content: './src/content.tsx',
-    background: './src/background.js'
+    background: './src/background.js',
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
@@ -34,16 +35,17 @@ module.exports = {
     },
   },
   plugins: [
-    new CleanWebpackPlugin(), // ✅ Clean dist/ before each build
+    new CleanWebpackPlugin(),
     new HtmlWebpackPlugin({
       template: './src/popup.html',
       filename: 'popup.html',
       chunks: ['popup'],
     }),
     new CopyPlugin({
-      patterns: [
-        { from: 'public', to: '.' },
-      ],
+      patterns: [{ from: 'public', to: '.' }],
+    }),
+    new webpack.DefinePlugin({
+      'process.env.GROQ_API_KEY': JSON.stringify(process.env.GROQ_API_KEY || ''),
     }),
   ],
 };
