@@ -43,13 +43,13 @@ BEGIN
         document_id,
         chunk_number,
         chunk_content,
-        embeddings,
+        encrypted_embeddings,  -- CHANGED: renamed from "embeddings" to "encrypted_embeddings"
         metadata
       ) VALUES (
         v_document_id,
         (v_chunk->>'chunkNumber')::INTEGER,
         v_chunk->>'content',
-        (v_chunk->>'embeddings')::vector,
+        (v_chunk->>'encrypted_embeddings')::vector,  -- CHANGED: renamed from "embeddings" to "encrypted_embeddings"
         CASE 
           WHEN v_chunk->'metadata' IS NOT NULL THEN v_chunk->'metadata' 
           ELSE '{}'::json 

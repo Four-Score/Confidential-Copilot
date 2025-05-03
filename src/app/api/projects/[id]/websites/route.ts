@@ -94,7 +94,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
-    const projectId = params.id;
+    const { id: projectId } = await params;
     
     // Initialize Supabase client
     const supabase = await createClient();

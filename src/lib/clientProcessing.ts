@@ -429,7 +429,7 @@ export async function processWebsite(
       throw new Error('Operation cancelled by user');
     }
 
-    // Step 4: Generate embeddings
+    // Step 4: Generate embeddings and encrypt them
     await reportProgress('embedding', 50, 'Generating embeddings...');
     
     const chunksWithEmbeddings = await Promise.all(
@@ -445,9 +445,12 @@ export async function processWebsite(
         // Generate embedding
         const embedding = await generateEmbedding(chunk.content);
         
+        // Encrypt the embedding - only the embeddings need encryption, not the content
+        const encryptedEmbedding = await encryptVector(embedding);
+        
         return {
           ...chunk,
-          embeddings: embedding
+          embeddings: encryptedEmbedding // Store encrypted embeddings
         };
       })
     );
@@ -475,7 +478,7 @@ export async function processWebsite(
     const formattedChunks = chunksWithEmbeddings.map(chunk => ({
       chunkNumber: chunk.chunkNumber,
       content: chunk.content,
-      embeddings: chunk.embeddings,
+      encrypted_embeddings: chunk.embeddings, // Using the field name 'encrypted_embeddings'
       metadata: chunk.metadata
     }));
 

@@ -66,7 +66,7 @@ CREATE TABLE public.v2_vector_chunks (
   document_id UUID NOT NULL REFERENCES public.v2_documents(id) ON DELETE CASCADE,
   chunk_number INTEGER NOT NULL,
   chunk_content TEXT, -- Plain chunk content
-  embeddings VECTOR(384), -- 384 dimensions for MiniLM-L6-v2 model
+  encrypted_embeddings VECTOR(384), -- 384 dimensions for MiniLM-L6-v2 model
   metadata JSON, -- Plain metadata (page info, position)
   
   -- Ensure chunks for a document have unique chunk numbers

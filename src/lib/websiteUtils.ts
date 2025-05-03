@@ -5,10 +5,10 @@ import * as cheerio from 'cheerio';
  * Constants for website processing
  */
 export const WEBSITE_CONSTANTS = {
-  DEFAULT_CHUNK_SIZE: 1000,
+  DEFAULT_CHUNK_SIZE: 5000,
   DEFAULT_CHUNK_OVERLAP: 200,
   TIMEOUT_MS: 10000, // 10 seconds timeout for fetching
-  MAX_CONTENT_LENGTH: 5000000, // ~5MB max content size
+  MAX_CONTENT_LENGTH: 5000000, 
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY_MS: 1000,
 };
@@ -204,44 +204,24 @@ export function chunkWebsiteContent(
   chunkSize: number = WEBSITE_CONSTANTS.DEFAULT_CHUNK_SIZE,
   chunkOverlap: number = WEBSITE_CONSTANTS.DEFAULT_CHUNK_OVERLAP
 ): WebsiteChunk[] {
-  const chunks: WebsiteChunk[] = [];
-  const contentLength = content.length;
-  
-  // If content is smaller than chunk size, return a single chunk
-  if (contentLength <= chunkSize) {
-    chunks.push({
-      chunkNumber: 0,
-      content,
-      metadata: {
-        url: metadata.url,
-        chunkIndex: 0,
-        startPosition: 0,
-        endPosition: contentLength - 1,
-      },
-    });
-    return chunks;
+  // Safety checks
+  if (!content || content.trim().length === 0) {
+    return [];
   }
   
-  // Split content into chunks
-  let startIdx = 0;
+  // Clean up the content before chunking
+  const cleanedContent = cleanHtmlContent(content);
+  
+  // Simple sliding window chunking (similar to PDF chunking)
+  const chunks: WebsiteChunk[] = [];
+  let start = 0;
   let chunkNumber = 0;
   
-  while (startIdx < contentLength) {
-    // Calculate end index for this chunk
-    let endIdx = Math.min(startIdx + chunkSize, contentLength);
+  while (start < cleanedContent.length) {
+    const end = Math.min(start + chunkSize, cleanedContent.length);
+    const chunkContent = cleanedContent.substring(start, end).trim();
     
-    // Adjust end index to not cut words in the middle if not at the end
-    if (endIdx < contentLength) {
-      // Look for the nearest space or newline after the calculated end index
-      while (endIdx < contentLength && content[endIdx] !== ' ' && content[endIdx] !== '\n') {
-        endIdx++;
-      }
-    }
-    
-    // Extract this chunk
-    const chunkContent = content.substring(startIdx, endIdx).trim();
-    
-    // Add to chunks array
+    // Only add non-empty chunks
     if (chunkContent) {
       chunks.push({
         chunkNumber,
@@ -249,24 +229,21 @@ export function chunkWebsiteContent(
         metadata: {
           url: metadata.url,
           chunkIndex: chunkNumber,
-          startPosition: startIdx,
-          endPosition: endIdx - 1,
+          startPosition: start,
+          endPosition: end - 1,
         },
       });
     }
     
-    // Move to the next chunk with overlap
-    startIdx = endIdx - chunkOverlap;
-    if (startIdx < 0) startIdx = 0;
+    chunkNumber++;
+    start += chunkSize - chunkOverlap;
     
-    // If we're at the end, break
-    if (startIdx >= contentLength) {
+    // Safety check to prevent infinite loop
+    if (start >= cleanedContent.length || start < 0) {
       break;
     }
-    
-    chunkNumber++;
   }
-  
+
   return chunks;
 }
 

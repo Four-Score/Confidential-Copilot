@@ -52,7 +52,7 @@ export async function GET(
   { params }: { params: { id: string, websiteId: string } }
 ): Promise<NextResponse> {
   try {
-    const { id: projectId, websiteId } = params;
+    const { id: projectId, websiteId } = await params;
     
     // Initialize Supabase client
     const supabase = await createClient();

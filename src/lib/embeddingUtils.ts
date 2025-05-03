@@ -11,7 +11,7 @@ export const MAX_BATCH_SIZE = 10;
 export async function createEmbeddingModel() {
   try {
     const model = new HuggingFaceTransformersEmbeddings({
-      model: "Xenova/all-MiniLM-L6-v2", // 384-dimensional embeddings
+      model: "Xenova/all-MiniLM-L6-v2",// 384-dimensional embeddings
     });
     return model;
   } catch (error) {
