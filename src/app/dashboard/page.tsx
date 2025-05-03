@@ -102,7 +102,7 @@ export default function DashboardPage() {
                                 >
                                     📝
                                 </div>
-                                <span className="text-xs mt-1">Summarizer</span>
+                                <span className="text-xs mt-1">Transcript Summarizer</span>
                             </div>
 
                             {/* Other Icons */}
@@ -119,8 +119,14 @@ export default function DashboardPage() {
                                 <span className="text-xs mt-1">Email mode</span>
                             </div>
                             <div className="flex flex-col items-center">
-                                <div className="text-xl">🧭</div>
-                                <span className="text-xs mt-1">Discover</span>
+                                <div 
+                                onClick={() => router.push('/dashboard/youtube-transcript')}
+                                className="text-xl cursor-pointer hover:text-blue-600 transition-colors"
+                                title="YouTube Transcript">
+                                    🎥
+                                </div>
+
+                                <span className="text-xs mt-1">Youtube</span>
                             </div>
                             <div className="flex flex-col items-center">
                                 <div className="text-xl">📑</div>
