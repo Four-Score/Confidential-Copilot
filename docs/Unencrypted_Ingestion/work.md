@@ -15,6 +15,13 @@ This SQL script defines the schema for storing website data and its vector embed
 (a) Confidential-Copilot\src\lib\websiteUtils.ts:
 websiteUtils.ts provides utilities for extracting and processing content from websites. It includes functions for validating URLs (`validateWebsiteUrl`), extracting content (`extractWebsiteContent`), cleaning HTML (`cleanHtmlContent`), chunking content (`chunkWebsiteContent`), and handling errors (`handleWebsiteError`). It also defines interfaces for website extraction results, metadata, and content chunks.
 
+2. API Proxy for CORS Bypass
+(a) Confidential-Copilot\src\app\api\proxy\website\route.ts:
+This server-side endpoint acts as a proxy for website content retrieval, solving CORS issues that occur when directly requesting external website content from client-side code. It receives a URL in the request body, fetches the website content server-side using axios (avoiding browser CORS restrictions), extracts basic metadata with cheerio, and returns both the HTML content and metadata to the client. Authentication via Supabase ensures only authorized users can use the proxy.
+
+(b) Confidential-Copilot\src\app\api\proxy\website\validate\route.ts:
+A validation endpoint that checks if a provided URL is accessible without triggering CORS issues. It performs a HEAD request to the target website to verify availability, returning validation status that client-side code can use before attempting full content extraction. Like the main proxy endpoint, it requires authentication to prevent abuse.
+
 
 # Update Processing Pipeline
 1. Modify Type Definitions
@@ -47,7 +54,6 @@ processingUtils.ts provides client-side utilities for processing documents, incl
 
 (c) Update the Website Processing Functions: Confidential-Copilot\src\lib\clientProcessing.ts:
 clientProcessing.ts contains the client-side logic for processing both PDF documents and website content. It includes functions like `processDocument` for handling PDFs (extraction, chunking, embedding generation, encryption, and upload) and `processWebsite` for handling website content (extraction, chunking, embedding generation, and storage). For website content, only the vector embeddings are encrypted to ensure compatibility with the search functionality, while the content and metadata remain unencrypted since they're from public websites. The function utilizes utility functions from other modules for tasks like PDF and website content extraction, embedding generation, encryption, and progress reporting.
-
 
 (d) Create a New API Route for Website Progress Status: Confidential-Copilot\src\app\api\websites\progress\route.ts:
 This route.ts file defines a GET API endpoint for retrieving the processing status of a specific job (identified by `jobId`). It authenticates the user via Supabase, then makes an internal request to `/api/documents/progress` to fetch the status, and returns the status data as a JSON response. The function `GET` handles the request, using `createClient` to initialize the Supabase client and `NextResponse` to return JSON responses.

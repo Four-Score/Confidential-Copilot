@@ -69,27 +69,27 @@ export async function validateWebsiteUrl(
     return { isValid: false, message: 'Invalid URL format' };
   }
 
-  // Try to access the URL
+  // Try to access the URL using our proxy
   try {
-    const response = await axios.head(url, {
-      timeout: WEBSITE_CONSTANTS.TIMEOUT_MS,
-      maxRedirects: 5,
+    const response = await fetch('/api/proxy/website/validate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ url })
     });
     
-    // Check if the response is successful (status code 2xx)
-    if (response.status >= 200 && response.status < 300) {
+    if (response.ok) {
       return { isValid: true };
     } else {
-      return { isValid: false, message: `URL returned status code: ${response.status}` };
+      const data = await response.json();
+      return { isValid: false, message: data.error || `URL validation failed: ${response.status}` };
     }
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      if (error.code === 'ECONNABORTED') {
-        return { isValid: false, message: 'Connection timed out' };
-      }
-      return { isValid: false, message: error.message || 'Error accessing URL' };
-    }
-    return { isValid: false, message: 'Error accessing URL' };
+    return { 
+      isValid: false, 
+      message: error instanceof Error ? error.message : 'Error accessing URL' 
+    };
   }
 }
 
@@ -102,26 +102,28 @@ export async function extractWebsiteContent(
   url: string
 ): Promise<{ content: string; metadata: WebsiteMetadata }> {
   try {
-    // Fetch the website content
-    const response = await axios.get(url, {
-      timeout: WEBSITE_CONSTANTS.TIMEOUT_MS,
-      maxRedirects: 5,
+    // Use our proxy endpoint instead of direct axios request
+    const response = await fetch('/api/proxy/website', {
+      method: 'POST',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ url })
     });
 
-    const html = response.data;
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to fetch content: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const html = data.html;
+    
+    // Use cheerio to process the HTML
     const $ = cheerio.load(html);
 
     // Remove unwanted elements
     $('script, style, noscript, iframe, embed, object').remove();
-
-    // Extract the title
-    const title = $('title').text().trim() || new URL(url).hostname;
-    
-    // Extract the description
-    const description = $('meta[name="description"]').attr('content') || '';
 
     // Extract text from the body
     // First remove navigation, header, footer etc. if present
@@ -139,11 +141,11 @@ export async function extractWebsiteContent(
     // Clean up the text
     bodyText = cleanHtmlContent(bodyText);
 
-    // Create the metadata
+    // Create the metadata - use data from proxy if available
     const metadata: WebsiteMetadata = {
       url,
-      title,
-      description,
+      title: data.metadata?.title || new URL(url).hostname,
+      description: data.metadata?.description || '',
       extractedAt: new Date().toISOString(),
       contentLength: bodyText.length,
     };
@@ -154,7 +156,7 @@ export async function extractWebsiteContent(
     };
   } catch (error) {
     let errorMessage = 'Failed to extract website content';
-    if (axios.isAxiosError(error)) {
+    if (error instanceof Error) {
       errorMessage = `Failed to extract website content: ${error.message}`;
     }
     throw new Error(errorMessage);
@@ -223,7 +225,7 @@ export function chunkWebsiteContent(
     
     // Only add non-empty chunks
     if (chunkContent) {
-      chunks.push({
+      const chunk = {
         chunkNumber,
         content: chunkContent,
         metadata: {
@@ -232,7 +234,12 @@ export function chunkWebsiteContent(
           startPosition: start,
           endPosition: end - 1,
         },
-      });
+      };
+      
+      // Log chunk details as it's pushed
+      console.log(`Chunk ${chunkNumber} created: URL ${metadata.url} | Size: ${chunkContent.length} | Range: ${start}-${end-1}`);
+      
+      chunks.push(chunk);
     }
     
     chunkNumber++;
@@ -244,6 +251,7 @@ export function chunkWebsiteContent(
     }
   }
 
+  console.log(`Total chunks created: ${chunks.length} for URL: ${metadata.url}`);
   return chunks;
 }
 
