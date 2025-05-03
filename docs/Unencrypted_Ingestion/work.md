@@ -90,5 +90,4 @@ The DocumentList.tsx component has been extended to handle both encrypted docume
 (a) Confidential-Copilot\src\app\projects\[id]\page.tsx:
 The ProjectPage component has been updated to integrate both document types into a unified view. It now combines the arrays of encrypted documents and unencrypted websites into a single collection for display, while maintaining separate state management for each type. The page properly dispatches deletion requests to the appropriate API endpoints based on document type, and displays a more inclusive heading ("Documents & Websites") to reflect the combined content view. The empty state message has also been updated to acknowledge both content types.
 
-These updates complete Phase 6 of the Website Content Ingestion Pipeline implementation plan, providing users with a consistent interface for viewing and managing both encrypted PDF documents and unencrypted website content within the same project view.
 

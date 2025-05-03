@@ -38,7 +38,9 @@ export type DocumentType = 'encrypted' | 'unencrypted';
 
 // Type guard to check if a document is unencrypted
 export function isUnencryptedDocument(doc: Document | UnencryptedDocument): doc is UnencryptedDocument {
-  return 'content' in doc && !('encrypted_content' in doc);
+  // Check if it's a website type or if it has unencrypted content
+  return doc.type === 'website' || 
+         ('content' in doc && !('encrypted_content' in doc));
 }
 
 // Type for website chunk

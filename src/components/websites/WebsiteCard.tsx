@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { UnencryptedDocument } from '@/types/document';
 
 interface WebsiteCardProps {
@@ -10,6 +10,7 @@ export default function WebsiteCard({ website, onDelete }: WebsiteCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [faviconUrl, setFaviconUrl] = useState<string | null>(null);
 
   const formattedDate = new Date(website.upload_date).toLocaleDateString('en-US', {
     year: 'numeric',
@@ -18,7 +19,51 @@ export default function WebsiteCard({ website, onDelete }: WebsiteCardProps) {
   });
 
   const formattedSize = formatFileSize(website.file_size);
-  const metadata = website.metadata;
+  const metadata = website.metadata || {};
+  
+  // First try to get URL from top level (API provides this), then from metadata
+  // Using type assertion since the property might come from API but is not in TypeScript type
+  const websiteUrl = (website as any).url || (website.metadata && website.metadata.url) || '';
+  
+  // First try to get title from top level (API provides this), then from metadata
+  const websiteTitle = (website as any).title || (metadata as any).title || '';
+
+  console.log(`WebsiteCard rendering for ${websiteTitle}:`, {
+    id: website.id,
+    websiteUrl,
+    topLevelFavicon: (website as any).favicon,
+    metadataFavicon: (metadata as any).favicon,
+    metadata
+  });
+
+  useEffect(() => {
+    // Get favicon URL from metadata or generate fallback
+    const getFavicon = (): string => {
+      // First check if favicon exists at top level (from API GET response)
+      if ((website as any).favicon) {
+        console.log(`Using top-level favicon for ${websiteTitle}`);
+        return (website as any).favicon;
+      }
+      
+      // Then check if favicon exists in metadata (from direct upload response)
+      if ((metadata as any).favicon) {
+        console.log(`Using metadata favicon for ${websiteTitle}`);
+        return (metadata as any).favicon;
+      }
+      
+      // If we have a URL (either from top level or metadata), generate a favicon
+      if (websiteUrl) {
+        const domain = getDomain(websiteUrl);
+        console.log(`Generating favicon from URL for ${websiteTitle}: ${domain}`);
+        return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+      }
+      
+      console.log(`Using default favicon for ${websiteTitle}`);
+      return '/globe.svg'; // Fallback icon
+    };
+
+    setFaviconUrl(getFavicon());
+  }, [website.id, websiteUrl, websiteTitle]);
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent navigation
@@ -62,20 +107,6 @@ export default function WebsiteCard({ website, onDelete }: WebsiteCardProps) {
     }
   };
 
-  // Get favicon URL from metadata or generate fallback
-  const getFavicon = (): string => {
-    if (metadata?.favicon) {
-      return metadata.favicon;
-    }
-    
-    if (metadata?.url) {
-      const domain = getDomain(metadata.url);
-      return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-    }
-    
-    return '/globe.svg'; // Fallback icon
-  };
-
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
       <div className="p-5">
@@ -83,10 +114,11 @@ export default function WebsiteCard({ website, onDelete }: WebsiteCardProps) {
           <div className="flex items-center">
             <div className="h-12 w-12 flex items-center justify-center">
               <img 
-                src={getFavicon()} 
-                alt={metadata?.title || 'Website icon'} 
+                src={faviconUrl || '/globe.svg'} 
+                alt={websiteTitle || 'Website icon'} 
                 className="max-h-10 max-w-10"
                 onError={(e) => {
+                  console.log(`Favicon load error for ${websiteTitle}. Falling back to default.`);
                   // Fallback to default icon if the favicon fails to load
                   (e.target as HTMLImageElement).src = '/globe.svg';
                 }}
@@ -94,7 +126,7 @@ export default function WebsiteCard({ website, onDelete }: WebsiteCardProps) {
             </div>
             <div className="ml-4">
               <h3 className="text-lg font-medium text-gray-900 mb-1 truncate max-w-xs">
-                {metadata?.title || getDomain(metadata?.url || '')}
+                {websiteTitle || getDomain(websiteUrl)}
               </h3>
               <p className="text-sm text-gray-500">Added on {formattedDate}</p>
             </div>
@@ -155,13 +187,13 @@ export default function WebsiteCard({ website, onDelete }: WebsiteCardProps) {
           <div className="bg-gray-50 p-3 rounded col-span-2">
             <span className="text-xs text-gray-500 block">URL</span>
             <a 
-              href={metadata?.url || '#'} 
+              href={websiteUrl || '#'} 
               target="_blank" 
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
               className="font-medium text-blue-600 hover:text-blue-800 truncate block"
             >
-              {metadata?.url || 'Unknown URL'}
+              {websiteUrl || 'Unknown URL'}
             </a>
           </div>
         </div>

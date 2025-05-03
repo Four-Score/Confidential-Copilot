@@ -156,7 +156,9 @@ export async function GET(
       file_size: website.file_size,
       url: website.metadata?.url || '',
       title: website.metadata?.title || website.name,
-      description: website.metadata?.description || ''
+      description: website.metadata?.description || '',
+      favicon: website.metadata?.favicon || '',
+      metadata: website.metadata || {}
     }));
     
     return NextResponse.json({ websites: formattedWebsites });
