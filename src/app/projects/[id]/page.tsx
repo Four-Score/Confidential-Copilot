@@ -5,9 +5,12 @@ import { useParams } from 'next/navigation';
 import ProjectHeader from '@/components/projects/ProjectHeader';
 import DocumentList from '@/components/documents/DocumentList';
 import DocumentUploader from '@/components/documents/DocumentUploader';
+import WebsiteUrlInput from '@/components/website/WebsiteUrlInput';
+import WebsitePreview from '@/components/website/WebsitePreview';
 import { Project } from '@/types/project';
-import { Document } from '@/types/document';
+import { Document, UnencryptedDocument } from '@/types/document';
 import { useKeyManagement } from '@/services/keyManagement';
+import { useDocumentProcessor } from '@/hooks/useDocumentProcessor';
 
 export default function ProjectPage() {
   const params = useParams();
@@ -15,14 +18,30 @@ export default function ProjectPage() {
   
   const [project, setProject] = useState<Project | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [websites, setWebsites] = useState<UnencryptedDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showUploader, setShowUploader] = useState(false);
+  const [showWebsiteInput, setShowWebsiteInput] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [websiteSuccess, setWebsiteSuccess] = useState(false);
   const [uploadedDocument, setUploadedDocument] = useState<Document | null>(null);
+  const [uploadedWebsite, setUploadedWebsite] = useState<UnencryptedDocument | null>(null);
+  const [currentUrl, setCurrentUrl] = useState<string | null>(null);
   
   // Get encryption service
   const { service: encryptionService, isLoading: isEncryptionLoading } = useKeyManagement();
+  
+  // Get document processor
+  const { 
+    processFile, 
+    processWebsiteUrl, 
+    isProcessing,
+    progress,
+    status,
+    error: processingError,
+    reset 
+  } = useDocumentProcessor();
   
   // Fetch project and documents when component mounts
   useEffect(() => {
@@ -62,6 +81,19 @@ export default function ProjectPage() {
         }
         
         setDocuments(Array.isArray(decryptedDocuments) ? decryptedDocuments : []);
+        
+        // Fetch websites for this project
+        try {
+          const websitesResponse = await fetch(`/api/projects/${projectId}/websites`);
+          
+          if (websitesResponse.ok) {
+            const websitesData = await websitesResponse.json();
+            setWebsites(Array.isArray(websitesData.websites) ? websitesData.websites : []);
+          }
+        } catch (websiteError) {
+          console.error('Error fetching websites:', websiteError);
+          // Non-critical error, we can still continue
+        }
       } catch (err) {
         console.error('Error fetching project data:', err);
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
@@ -88,6 +120,25 @@ export default function ProjectPage() {
     setUploadSuccess(true);
     setDocuments(prevDocs => [newDocument, ...prevDocs]);
   };
+
+  // Handle website processing completion
+  const handleWebsiteProcessed = async (websiteId: string) => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/websites/${websiteId}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to get website details after upload');
+      }
+      
+      const websiteData = await response.json();
+      setUploadedWebsite(websiteData);
+      setWebsiteSuccess(true);
+      setWebsites(prevSites => [websiteData, ...prevSites]);
+    } catch (err) {
+      console.error('Error getting website details:', err);
+      setError('Failed to get website details');
+    }
+  };
   
   // Handle document upload cancellation
   const handleUploadCancel = () => {
@@ -96,11 +147,42 @@ export default function ProjectPage() {
     setShowUploader(false);
   };
 
+  // Handle website input cancellation
+  const handleWebsiteInputCancel = () => {
+    console.log('Website input canceled');
+    setShowWebsiteInput(false);
+    setCurrentUrl(null);
+    reset(); // Reset the document processor state
+  };
+
+  // Handle URL submission
+  const handleUrlSubmit = async (url: string) => {
+    setCurrentUrl(url);
+    
+    try {
+      const result = await processWebsiteUrl(projectId, url);
+      
+      if (result.success && result.websiteId) {
+        await handleWebsiteProcessed(result.websiteId);
+      } else {
+        setError(result.error || 'Failed to process website');
+      }
+    } catch (err) {
+      console.error('Error processing website:', err);
+      setError(err instanceof Error ? err.message : 'Failed to process website');
+    }
+  };
+
   // Handle going back to project view after successful upload
   const handleBackToProject = () => {
     setShowUploader(false);
+    setShowWebsiteInput(false);
     setUploadSuccess(false);
+    setWebsiteSuccess(false);
     setUploadedDocument(null);
+    setUploadedWebsite(null);
+    setCurrentUrl(null);
+    reset();
   };
 
   // Handle document deletion
@@ -126,6 +208,29 @@ export default function ProjectPage() {
     }
   };
 
+  // Handle website deletion
+  const handleDeleteWebsite = async (websiteId: string) => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/websites/${websiteId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete website');
+      }
+      
+      setWebsites(websites.filter(site => site.id !== websiteId));
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting website:', err);
+      return { 
+        success: false, 
+        error: err instanceof Error ? err.message : 'An unknown error occurred' 
+      };
+    }
+  };
+
   // Function to render the data ingestion buttons
   const renderDataIngestionButtons = () => {
     return (
@@ -144,19 +249,8 @@ export default function ProjectPage() {
           </button>
           
           <button
-            className="flex flex-col items-center justify-center p-4 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors cursor-not-allowed opacity-70"
-            disabled
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-red-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-            <span className="text-sm font-medium text-gray-800">YouTube Content</span>
-            <span className="text-xs text-gray-500 text-center mt-1">Import videos securely</span>
-          </button>
-          
-          <button
-            className="flex flex-col items-center justify-center p-4 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg transition-colors cursor-not-allowed opacity-70"
-            disabled
+            onClick={() => setShowWebsiteInput(true)}
+            className="flex flex-col items-center justify-center p-4 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-purple-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9-3-9m-9 9a9 9 0 019-9" />
@@ -170,6 +264,17 @@ export default function ProjectPage() {
             disabled
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-green-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span className="text-sm font-medium text-gray-800">YouTube Content</span>
+            <span className="text-xs text-gray-500 text-center mt-1">Import videos securely</span>
+          </button>
+          
+          <button
+            className="flex flex-col items-center justify-center p-4 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors cursor-not-allowed opacity-70"
+            disabled
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-red-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
             <span className="text-sm font-medium text-gray-800">Email Import</span>
@@ -208,6 +313,55 @@ export default function ProjectPage() {
           <strong className="font-bold">Error:</strong>
           <span className="block sm:inline"> {error || 'Project not found'}</span>
         </div>
+      </div>
+    );
+  }
+
+  // Show website URL input if the website button was clicked
+  if (showWebsiteInput) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <ProjectHeader project={project} />
+        
+        {websiteSuccess ? (
+          <div className="bg-white shadow-lg rounded-lg p-6 mb-8">
+            <div className="text-center py-6">
+              <div className="mb-4">
+                <svg className="mx-auto h-12 w-12 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Website Content Added Successfully!
+              </h3>
+              <p className="text-gray-600 mb-6">
+                {uploadedWebsite?.name || "Website content"} has been processed and added to your project.
+              </p>
+              <button
+                onClick={handleBackToProject}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Back to Project
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-8">
+            {currentUrl && !isProcessing ? (
+              <div className="mb-4">
+                <WebsitePreview url={currentUrl} />
+              </div>
+            ) : null}
+            <WebsiteUrlInput
+              onUrlSubmit={handleUrlSubmit}
+              onCancel={handleWebsiteInputCancel}
+              isLoading={isProcessing}
+              progress={progress}
+              currentStep={status}
+              error={processingError}
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -253,6 +407,9 @@ export default function ProjectPage() {
     );
   }
 
+  // Combine documents and websites for display
+  const allDocuments = [...documents, ...websites];
+  
   // Normal project page view with data ingestion buttons and document list
   return (
     <div className="container mx-auto px-4 py-8">
@@ -262,14 +419,18 @@ export default function ProjectPage() {
       {renderDataIngestionButtons()}
       
       {/* Documents Section */}
-      <h2 className="text-2xl font-bold text-gray-800 mb-4">Documents</h2>
+      <h2 className="text-2xl font-bold text-gray-800 mb-4">Documents & Websites</h2>
       
-      {documents.length > 0 ? (
-        <DocumentList documents={documents} onDelete={handleDeleteDocument} />
+      {allDocuments.length > 0 ? (
+        <DocumentList 
+          documents={allDocuments} 
+          onDelete={handleDeleteDocument}
+          onWebsiteDelete={handleDeleteWebsite} 
+        />
       ) : (
         <div className="bg-gray-50 rounded-lg p-6 text-center">
-          <p className="text-gray-500">No documents have been uploaded to this project yet.</p>
-          <p className="text-gray-500 mt-2">Use the data ingestion options above to add your first document.</p>
+          <p className="text-gray-500">No documents or websites have been added to this project yet.</p>
+          <p className="text-gray-500 mt-2">Use the data ingestion options above to add your first document or website.</p>
         </div>
       )}
     </div>

@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { ProcessingProgressEvent } from '@/lib/processingUtils';
-import { processDocument, DocumentProcessingOptions, ProcessingResult } from '@/lib/clientProcessing';
+import { processDocument, processWebsite, DocumentProcessingOptions, ProcessingResult, WebsiteProcessingOptions, WebsiteProcessingResult } from '@/lib/clientProcessing';
 
 /**
  * Hook for document processing operations
@@ -76,8 +76,61 @@ export function useDocumentProcessor() {
     [symmetricKey]
   );
   
+  const processWebsiteUrl = useCallback(
+    async (
+      projectId: string,
+      url: string,
+      options?: WebsiteProcessingOptions
+    ): Promise<WebsiteProcessingResult> => {
+      setIsProcessing(true);
+      setProgress(0);
+      setStatus('Initializing website processing');
+      setError(null);
+      
+      try {
+        // Enhance options with progress tracking
+        const enhancedOptions: WebsiteProcessingOptions = {
+          ...options,
+          onProgress: (event: ProcessingProgressEvent) => {
+            setProgress(event.progress);
+            setStatus(event.currentStep || null);
+            
+            // Forward the progress event to the original callback if provided
+            options?.onProgress?.(event);
+          }
+        };
+        
+        // Call the processWebsite function (note: no symmetricKey needed)
+        const result = await processWebsite(
+          projectId,
+          url,
+          enhancedOptions
+        );
+        
+        if (!result.success) {
+          setError(result.error || 'Website processing failed');
+        }
+        
+        return result;
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        setError(errorMessage);
+        
+        return {
+          websiteId: '',
+          success: false,
+          error: errorMessage
+        };
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [] // No dependencies since we don't need symmetricKey for websites
+  );
+  
   return {
     processFile,
+    processWebsiteUrl, 
     isProcessing,
     progress,
     status,

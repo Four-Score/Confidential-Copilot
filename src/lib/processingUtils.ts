@@ -8,6 +8,8 @@ import { encryptText, encryptMetadata, encryptVector } from '@/services/keyManag
  */
 export type ProcessingStatus = 
   | 'initialized'
+  | 'validating'
+  | 'storing'
   | 'extracting'
   | 'chunking'
   | 'embedding'
@@ -74,12 +76,18 @@ export async function initiateProcessingJob(
 
 /**
  * Updates the progress of a processing job
+ * @param jobId - The ID of the processing job
+ * @param progress - The progress value (0-100)
+ * @param status - The current status
+ * @param currentStep - Optional current step description
+ * @param contentType - The type of content being processed
  */
 export async function updateProcessingProgress(
   jobId: string,
   progress: number,
-  status: ProcessingStatus,
-  error?: string
+  status: string,
+  currentStep?: string,
+  contentType: 'document' | 'website' = 'document'
 ): Promise<void> {
   const response = await fetch('/api/documents/progress', {
     method: 'POST',
@@ -90,7 +98,8 @@ export async function updateProcessingProgress(
       uploadId: jobId,
       progress,
       status,
-      error,
+      error: currentStep,
+      contentType
     }),
   });
 

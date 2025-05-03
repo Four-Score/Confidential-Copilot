@@ -5,7 +5,7 @@ import {
   DocumentChunk, 
   PDFExtractionResult 
 } from './pdfUtils';
-import { generateBatchEmbeddings, ChunkWithEmbedding } from './embeddingUtils';
+import { generateBatchEmbeddings, generateEmbedding, ChunkWithEmbedding } from './embeddingUtils';
 import { encryptText, encryptMetadata, encryptVector } from '@/services/keyManagement';
 import { 
   initiateProcessingJob,
@@ -14,6 +14,15 @@ import {
   ProcessingProgressEvent 
 } from './processingUtils';
 import { PDFProcessingConfig, getProcessingConfig } from './processingConfig';
+import { 
+  validateWebsiteUrl, 
+  extractWebsiteContent, 
+  chunkWebsiteContent, 
+  WebsiteExtractionResult, 
+  WEBSITE_CONSTANTS 
+} from './websiteUtils';
+import { WebsiteMetadata, UnencryptedDocument } from '@/types/document';
+import { createClient } from '@/lib/supabase/client';
 
 /**
  * Result of document processing
@@ -48,6 +57,24 @@ export interface DocumentProcessingOptions {
    */
   abortSignal?: AbortSignal;
 }
+
+export interface WebsiteProcessingOptions {
+  signal?: AbortSignal;
+  onProgress?: (event: ProcessingProgressEvent) => void;
+  chunkSize?: number;
+  chunkOverlap?: number;
+}
+
+export interface WebsiteProcessingResult {
+  websiteId: string;
+  success: boolean;
+  error?: string;
+  metadata?: {
+    chunkCount: number;
+    processingTimeMs: number;
+  };
+}
+
 
 /**
  * Process document using client-side processing
@@ -301,6 +328,214 @@ export async function processDocument(
       documentId: '',
       success: false,
       error: (error as Error).message
+    };
+  }
+}
+
+export async function processWebsite(
+  projectId: string,
+  url: string,
+  options?: WebsiteProcessingOptions
+): Promise<WebsiteProcessingResult> {
+  const startTime = performance.now();
+  const jobId = uuidv4();
+  const onProgress = options?.onProgress || (() => {});
+  const signal = options?.signal;
+  const supabaseClient = createClient();
+  
+  // Report progress function - similar pattern to processDocument
+  const reportProgress = (
+    status: ProcessingStatus,
+    progress: number,
+    currentStep?: string
+  ) => {
+    const progressEvent: ProcessingProgressEvent = {
+      jobId,
+      status,
+      progress,
+      currentStep: currentStep || '',
+    };
+    
+    onProgress?.(progressEvent);
+    return updateProcessingProgress(
+      jobId, 
+      progress, 
+      status, 
+      currentStep,
+      'website'
+    );
+  };
+  
+  try {
+    // Initialize progress
+    await reportProgress('initialized', 0, 'Starting website processing');
+    
+    // Check if processing was aborted
+    if (signal?.aborted) {
+      await reportProgress('cancelled', 0, 'Operation cancelled by user');
+      throw new Error('Operation cancelled by user');
+    }
+
+    // Step 1: Validate URL
+    await reportProgress('validating', 10, 'Validating website URL...');
+    
+    const validationResult = await validateWebsiteUrl(url);
+    if (!validationResult.isValid) {
+      await reportProgress('error', 0, validationResult.message || 'Invalid URL');
+      return { 
+        websiteId: '', 
+        success: false, 
+        error: validationResult.message || 'Invalid URL' 
+      };
+    }
+    
+    // Check for abortion
+    if (signal?.aborted) {
+      await reportProgress('cancelled', 0, 'Operation cancelled by user');
+      throw new Error('Operation cancelled by user');
+    }
+
+    // Step 2: Extract content
+    await reportProgress('extracting', 20, 'Extracting website content...');
+    
+    const { content, metadata } = await extractWebsiteContent(url);
+    
+    if (!content || content.length === 0) {
+      await reportProgress('error', 0, 'No content extracted from website');
+      return { websiteId: '', success: false, error: 'No content extracted from website' };
+    }
+
+    // Check for abortion
+    if (signal?.aborted) {
+      await reportProgress('cancelled', 0, 'Operation cancelled by user');
+      throw new Error('Operation cancelled by user');
+    }
+
+    // Step 3: Chunk content
+    await reportProgress('chunking', 40, 'Chunking website content...');
+    
+    const chunks = chunkWebsiteContent(
+      content,
+      metadata,
+      options?.chunkSize || WEBSITE_CONSTANTS.DEFAULT_CHUNK_SIZE,
+      options?.chunkOverlap || WEBSITE_CONSTANTS.DEFAULT_CHUNK_OVERLAP
+    );
+
+    await reportProgress('chunking', 45, `Created ${chunks.length} text chunks`);
+
+    // Check for abortion
+    if (signal?.aborted) {
+      await reportProgress('cancelled', 0, 'Operation cancelled by user');
+      throw new Error('Operation cancelled by user');
+    }
+
+    // Step 4: Generate embeddings and encrypt them
+    await reportProgress('embedding', 50, 'Generating embeddings...');
+    
+    const chunksWithEmbeddings = await Promise.all(
+      chunks.map(async (chunk, index) => {
+        // Report individual chunk progress
+        const chunkProgress = 50 + ((index / chunks.length) * 30);
+        await reportProgress(
+          'embedding',
+          chunkProgress,
+          `Generating embedding for chunk ${index + 1}/${chunks.length}`
+        );
+        
+        // Generate embedding
+        const embedding = await generateEmbedding(chunk.content);
+        
+        // Encrypt the embedding - only the embeddings need encryption, not the content
+        const encryptedEmbedding = await encryptVector(embedding);
+        
+        return {
+          ...chunk,
+          embeddings: encryptedEmbedding // Store encrypted embeddings
+        };
+      })
+    );
+
+    // Check for abortion
+    if (signal?.aborted) {
+      await reportProgress('cancelled', 0, 'Operation cancelled by user');
+      throw new Error('Operation cancelled by user');
+    }
+
+    // Step 5: Store website
+    await reportProgress('storing', 80, 'Storing website data...');
+    
+    // Create the data object to insert into the database
+    const websiteData = {
+      project_id: projectId,
+      name: metadata.title || new URL(url).hostname,
+      type: 'website',
+      file_size: content.length,
+      content: content,
+      metadata: metadata
+    };
+    
+    // Format the chunks for database insertion
+    const formattedChunks = chunksWithEmbeddings.map(chunk => ({
+      chunkNumber: chunk.chunkNumber,
+      content: chunk.content,
+      encrypted_embeddings: chunk.embeddings, // Using the field name 'encrypted_embeddings'
+      metadata: chunk.metadata
+    }));
+
+    // Insert the website data and chunks into the database using the Supabase function
+    const { data, error } = await supabaseClient.rpc(
+      'insert_website_with_chunks',
+      {
+        p_project_id: projectId,
+        p_name: websiteData.name,
+        p_type: websiteData.type,
+        p_file_size: websiteData.file_size,
+        p_content: websiteData.content,
+        p_metadata: websiteData.metadata,
+        p_chunks: formattedChunks
+      }
+    );
+
+    // Check if there was an error during insertion
+    if (error) {
+      console.error('Error storing website data:', error);
+      await reportProgress('error', 0, `Database error: ${error.message}`);
+      return { websiteId: '', success: false, error: error.message };
+    }
+
+    // Log processing summary
+    const processingTime = performance.now() - startTime;
+    console.log('Website processing completed:', {
+      websiteId: data.id,
+      chunks: chunksWithEmbeddings.length,
+      processingTime: `${Math.round(processingTime)}ms`
+    });
+
+    // Final progress update
+    await reportProgress('completed', 100, 'Website processed successfully');
+    
+    return { 
+      websiteId: data.id, 
+      success: true,
+      metadata: {
+        chunkCount: chunksWithEmbeddings.length,
+        processingTimeMs: Math.round(processingTime)
+      }
+    };
+    
+  } catch (error) {
+    // If not already handled (like cancellation)
+    if ((error as Error).message !== 'Operation cancelled by user') {
+      console.error('Error processing website:', error);
+      const errorMessage = (error as Error).message || 'Unknown error during processing';
+      
+      await reportProgress('error', 0, errorMessage);
+    }
+    
+    return { 
+      websiteId: '', 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
     };
   }
 }
