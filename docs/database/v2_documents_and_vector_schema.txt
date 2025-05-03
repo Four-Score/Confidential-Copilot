@@ -1,0 +1,161 @@
+-- First ensure the document_type enum includes 'website'
+ALTER TYPE document_type ADD VALUE IF NOT EXISTS 'website';
+
+-- Create v2_documents table (unencrypted version of documents table)
+CREATE TABLE public.v2_documents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  name TEXT NOT NULL, -- Will store plain name (typically URL)
+  type document_type NOT NULL,
+  upload_date TIMESTAMPTZ NOT NULL DEFAULT now(),
+  content TEXT, -- Will store plain content
+  metadata JSON, -- Will store metadata in plain JSON (not JSONB)
+  file_size INTEGER, -- Size in bytes (for websites, this is the size of the extracted content)
+  page_count INTEGER NULL, -- Not typically used for websites, but kept for consistency
+  
+  -- For more efficient lookups by project
+  CONSTRAINT fk_project_v2 FOREIGN KEY (project_id) 
+    REFERENCES public.projects(id) ON DELETE CASCADE
+);
+
+-- Add index on project_id to optimize queries
+CREATE INDEX idx_v2_documents_project_id ON public.v2_documents(project_id);
+
+-- Enable Row Level Security
+ALTER TABLE public.v2_documents ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies - users can only access documents in their projects
+CREATE POLICY "Users can select their own v2 documents" 
+  ON public.v2_documents FOR SELECT 
+  USING (
+    project_id IN (
+      SELECT id FROM public.projects WHERE user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can insert v2 documents into their projects" 
+  ON public.v2_documents FOR INSERT 
+  WITH CHECK (
+    project_id IN (
+      SELECT id FROM public.projects WHERE user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can update their own v2 documents" 
+  ON public.v2_documents FOR UPDATE 
+  USING (
+    project_id IN (
+      SELECT id FROM public.projects WHERE user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can delete their own v2 documents" 
+  ON public.v2_documents FOR DELETE 
+  USING (
+    project_id IN (
+      SELECT id FROM public.projects WHERE user_id = auth.uid()
+    )
+  );
+
+-- Grant access to authenticated users
+GRANT ALL ON public.v2_documents TO authenticated;
+
+-- Create v2_vector_chunks table (unencrypted version of vector_chunks table)
+CREATE TABLE public.v2_vector_chunks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  document_id UUID NOT NULL REFERENCES public.v2_documents(id) ON DELETE CASCADE,
+  chunk_number INTEGER NOT NULL,
+  chunk_content TEXT, -- Plain chunk content
+  encrypted_embeddings VECTOR(384), -- 384 dimensions for MiniLM-L6-v2 model
+  metadata JSON, -- Plain metadata (page info, position)
+  
+  -- Ensure chunks for a document have unique chunk numbers
+  UNIQUE(document_id, chunk_number)
+);
+
+-- Add index on document_id for faster lookups
+CREATE INDEX idx_v2_vector_chunks_document_id ON public.v2_vector_chunks(document_id);
+
+-- Create a HNSW index for vector similarity search
+CREATE INDEX ON public.v2_vector_chunks
+USING hnsw (embeddings vector_cosine_ops)
+WITH (m = 16, ef_construction = 64);
+
+-- Enable Row Level Security
+ALTER TABLE public.v2_vector_chunks ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies
+CREATE POLICY "Users can select their own v2 vector chunks" 
+  ON public.v2_vector_chunks FOR SELECT 
+  USING (
+    document_id IN (
+      SELECT d.id FROM public.v2_documents d
+      JOIN public.projects p ON d.project_id = p.id
+      WHERE p.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can insert v2 vector chunks into their documents" 
+  ON public.v2_vector_chunks FOR INSERT 
+  WITH CHECK (
+    document_id IN (
+      SELECT d.id FROM public.v2_documents d
+      JOIN public.projects p ON d.project_id = p.id
+      WHERE p.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can update their own v2 vector chunks" 
+  ON public.v2_vector_chunks FOR UPDATE 
+  USING (
+    document_id IN (
+      SELECT d.id FROM public.v2_documents d
+      JOIN public.projects p ON d.project_id = p.id
+      WHERE p.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can delete their own v2 vector chunks" 
+  ON public.v2_vector_chunks FOR DELETE 
+  USING (
+    document_id IN (
+      SELECT d.id FROM public.v2_documents d
+      JOIN public.projects p ON d.project_id = p.id
+      WHERE p.user_id = auth.uid()
+    )
+  );
+
+-- Grant access to authenticated users
+GRANT ALL ON public.v2_vector_chunks TO authenticated;
+
+-- Create a similarity search function for unencrypted vector embeddings
+CREATE OR REPLACE FUNCTION match_v2_document_chunks(
+  query_embedding VECTOR(384),
+  filter_document_id UUID,
+  match_threshold FLOAT,
+  match_count INT
+)
+RETURNS TABLE (
+  id UUID,
+  document_id UUID,
+  chunk_number INTEGER,
+  metadata JSON,
+  similarity FLOAT
+)
+LANGUAGE SQL STABLE
+AS $$
+  SELECT
+    vc.id,
+    vc.document_id,
+    vc.chunk_number,
+    vc.metadata,
+    1 - (vc.embeddings <=> query_embedding) AS similarity
+  FROM 
+    public.v2_vector_chunks vc
+  WHERE 
+    (filter_document_id IS NULL OR vc.document_id = filter_document_id) AND
+    1 - (vc.embeddings <=> query_embedding) > match_threshold
+  ORDER BY 
+    vc.embeddings <=> query_embedding
+  LIMIT match_count;
+$$;

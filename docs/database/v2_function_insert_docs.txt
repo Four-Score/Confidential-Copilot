@@ -1,0 +1,77 @@
+-- Create a transaction-safe function to insert a website document with its chunks
+CREATE OR REPLACE FUNCTION public.insert_website_with_chunks(
+  p_project_id UUID,
+  p_name TEXT,
+  p_type TEXT,
+  p_file_size INTEGER,
+  p_content TEXT,
+  p_metadata JSON,
+  p_chunks JSON
+) RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_document_id UUID;
+  v_chunk JSON;
+  v_result JSON;
+BEGIN
+  -- Start a transaction
+  BEGIN
+    -- Insert document
+    INSERT INTO public.v2_documents (
+      project_id, 
+      name, 
+      type,
+      file_size,
+      content,
+      metadata
+    ) VALUES (
+      p_project_id,
+      p_name,
+      p_type::document_type,
+      p_file_size,
+      p_content,
+      p_metadata
+    )
+    RETURNING id INTO v_document_id;
+    
+    -- Insert chunks
+    FOR v_chunk IN SELECT * FROM json_array_elements(p_chunks)
+    LOOP
+      INSERT INTO public.v2_vector_chunks (
+        document_id,
+        chunk_number,
+        chunk_content,
+        encrypted_embeddings,  -- CHANGED: renamed from "embeddings" to "encrypted_embeddings"
+        metadata
+      ) VALUES (
+        v_document_id,
+        (v_chunk->>'chunkNumber')::INTEGER,
+        v_chunk->>'content',
+        (v_chunk->>'encrypted_embeddings')::vector,  -- CHANGED: renamed from "embeddings" to "encrypted_embeddings"
+        CASE 
+          WHEN v_chunk->'metadata' IS NOT NULL THEN v_chunk->'metadata' 
+          ELSE '{}'::json 
+        END
+      );
+    END LOOP;
+    
+    -- If we get here, everything succeeded
+    v_result := json_build_object(
+      'success', true,
+      'id', v_document_id
+    );
+    
+    -- Commit transaction happens automatically if we reach the end without errors
+    
+    RETURN v_result;
+  EXCEPTION WHEN OTHERS THEN
+    -- An error occurred, rollback the transaction
+    RAISE EXCEPTION 'Transaction failed: %', SQLERRM;
+  END;
+END;
+$$;
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION public.insert_website_with_chunks TO authenticated;
