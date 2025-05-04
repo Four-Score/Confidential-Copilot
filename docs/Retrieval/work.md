@@ -16,21 +16,21 @@ The retrieval flow implements a secure and intuitive interface for users to sear
 
 ### Dashboard UI Components
 
-#### ModeCard.tsx
+#### src\components\dashboard\ModeCard.tsx
 A reusable card component for displaying interaction modes (Chat, Email, Meeting, Document). Features include:
 - Icon, title, and description display
 - Hover animations with translation and shadow effects
 - Clickable functionality with smooth transitions
 - Props: `icon`, `title`, `description`, `onClick`
 
-#### ModesContainer.tsx
+#### src\components\dashboard\ModesContainer.tsx
 Container component that organizes multiple `ModeCard` components in a responsive grid layout:
 - Accepts an array of mode data through the `modes` prop
 - Renders each mode as a card
 - Implements responsive grid that adjusts from 1 to 4 columns based on viewport size
 - Includes a section title and consistent spacing
 
-#### page.tsx
+#### src\components\dashboard\page.tsx
 Main dashboard page that integrates the mode cards and retrieval button:
 - Implements `handleRetrievalClick` function to initiate the retrieval flow
 - Defines mode data for Chat, Email, Meeting, and Document cards
@@ -41,7 +41,7 @@ Main dashboard page that integrates the mode cards and retrieval button:
 
 ### Core Components
 
-#### Modal.tsx
+#### src\components\ui\Modal.tsx
 Base modal component with accessibility and animation features:
 - Creates a React portal for proper DOM placement
 - Implements backdrop overlay with click-outside closing
@@ -67,7 +67,7 @@ CSS module for modal transition animations:
 - Animation keyframes with translation and opacity changes
 - Container positioning classes
 
-#### ModalTransition.tsx
+#### src\components\ui\ModalTransition.tsx
 Component that applies directional animations to modal content:
 - Uses `animationDirection` and `isAnimating` states from ModalContext
 - Determines appropriate animation class based on navigation direction
@@ -76,7 +76,7 @@ Component that applies directional animations to modal content:
 
 ### Navigation System
 
-#### modalRoutes.ts
+#### src\constants\modalRoutes.ts
 Constants file defining standard route names for modal navigation:
 - `PROJECT_SELECTION`: First step for selecting a project
 - `DATA_SELECTION`: Second step for selecting documents
@@ -87,7 +87,7 @@ Constants file defining standard route names for modal navigation:
 
 ### Context Providers
 
-#### ModalContext.tsx
+#### src\contexts\ModalContext.tsx
 Context for managing modal state throughout the application:
 - `currentModal`: Tracks active modal type
 - `modalProps`: Stores properties passed to modals
@@ -102,7 +102,7 @@ Context for managing modal state throughout the application:
   - `replaceModal`: Replaces current modal without affecting history
 - Custom hook: `useModal()` for accessing modal functionality
 
-#### DataSelectionContext.tsx
+#### src\contexts\DataSelectionContext.tsx
 Context for managing selected projects and documents:
 - `selectedProjectId`/`selectedProjectName`: Currently selected project
 - `selectedDocuments`: Array of selected documents with their types
@@ -118,14 +118,14 @@ Context for managing selected projects and documents:
 
 ### Provider Implementation
 
-#### ModalProvider.tsx
+#### src\providers\ModalProvider.tsx
 Provider component that integrates the modal context with modal components:
 - Combines `BaseModalProvider` and `DataSelectionProvider`
 - Registers all modal components (ProjectSelectionModal, DataSelectionModal, SearchModal)
 - Makes modals accessible throughout the application
 - Maintains proper component hierarchy for context access
 
-#### DataSelectionProvider.tsx
+#### src\providers\DataSelectionProvider.tsx
 Provider that adds persistence to the data selection context:
 - Wraps `BaseDataSelectionProvider` with additional functionality
 - Implements `PersistenceLayer` component for localStorage operations:
@@ -135,14 +135,14 @@ Provider that adds persistence to the data selection context:
   - Clears document selections when no project is selected
 - Prevents unnecessary re-renders through component structure
 
-#### layout.tsx
+#### src\app\layout.tsx
 Root layout that incorporates the modal providers:
 - Wraps the entire application with `ModalProvider`
 - Ensures modal and data selection functionality is available globally
 
 ### Utility Hooks
 
-#### useRetrievalFlow.ts
+#### src\hooks\useRetrievalFlow.ts
 Custom hook providing high-level functions for the retrieval flow:
 - `startRetrievalFlow()`: Initiates flow from project selection
 - `startDocumentSelection(projectId, projectName)`: Skips to document selection
@@ -156,14 +156,14 @@ Custom hook providing high-level functions for the retrieval flow:
 
 ### Project Selection
 
-#### SelectableProjectCard.tsx
+#### src\hooks\useRetrievalFlow.ts
 Card component for displaying selectable project information:
 - Visual selection state with blue border and checkmark
 - Displays project name, description, and creation date
 - Props: `project`, `isSelected`, `onClick`
 - Formats dates with `formatDate` function
 
-#### ProjectSelectionModal.tsx
+#### src\components\retrieval\ProjectSelectionModal.tsx
 Modal for selecting a project to search within:
 - Reuses project fetching logic with `fetchProjects()`
 - Features search functionality to filter projects by name/description
@@ -176,7 +176,7 @@ Modal for selecting a project to search within:
 
 ### Document Selection
 
-#### SelectableDocumentCard.tsx
+#### src\components\retrieval\SelectableDocumentCard.tsx
 Card component for displaying selectable document information:
 - Supports both encrypted and unencrypted document types
 - Automatically decrypts document names using `keyManagementService.decryptMetadata()`
@@ -187,7 +187,7 @@ Card component for displaying selectable document information:
 - Integrates with `DataSelectionContext` through `isDocumentSelected` and `toggleDocument`
 - Handles document type icons with `getDocumentIcon`
 
-#### DataSelectionModal.tsx
+#### src\components\retrieval\DataSelectionModal.tsx
 Modal for selecting documents within a project:
 - Header with back button, project name, and close button
 - "Select All" checkbox for bulk selection
@@ -204,7 +204,7 @@ Modal for selecting documents within a project:
 
 ### Search Interface
 
-#### SearchModal.tsx
+#### src\components\retrieval\SearchModal.tsx
 Modal for searching across selected documents:
 - Search input field with validation
 - Search button with loading state
