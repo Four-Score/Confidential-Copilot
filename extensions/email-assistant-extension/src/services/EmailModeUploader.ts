@@ -1,5 +1,5 @@
 const API_URL = 'http://localhost:3000/api/email-mode/receive'; // Dev mode
-export async function uploadEmailSummariesToCopilotApp(emailSummaries: string[]) {
+export async function uploadEmailSummariesToCopilotApp(emailSummaries: string[], projectName: string) {
   chrome.storage.local.get('supabaseSession', async ({ supabaseSession }) => {
     const accessToken = supabaseSession?.access_token;
     if (!accessToken) {
@@ -14,7 +14,10 @@ export async function uploadEmailSummariesToCopilotApp(emailSummaries: string[])
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${accessToken}`, // ✅ Correct token
         },
-        body: JSON.stringify({ emailData: emailSummaries }),
+        body: JSON.stringify({
+          projectName, // ✅ Now included at top-level
+          emailData: emailSummaries, // ✅ Keep this
+        }),
       });
 
       const result = await response.json();

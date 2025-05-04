@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     const accessToken = authHeader.replace('Bearer ', '');
     console.log('🔐 Access Token Received:', accessToken.slice(0, 20));
-    // ✅ Create Supabase client with the access token (not service key!)
+
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -39,12 +39,12 @@ export async function POST(request: NextRequest) {
         },
       }
     );
+
     const { data, error } = await supabase.auth.getUser();
-const user = data?.user;
+    const user = data?.user;
 
-console.log('👤 Supabase user data:', data);
-console.log('🚨 Supabase error:', error);
-
+    console.log('👤 Supabase user data:', data);
+    console.log('🚨 Supabase error:', error);
 
     if (error || !user) {
       return new NextResponse(JSON.stringify({ error: 'Unauthorized' }), {
@@ -54,17 +54,43 @@ console.log('🚨 Supabase error:', error);
     }
 
     const body = await request.json();
-    const { emailData } = body;
+    console.log('📦 Parsed request body:', body);
+
+    const { emailData, projectName } = body;
+
+    if (!projectName) {
+      console.error('❌ Missing projectName in request body');
+      return new NextResponse(JSON.stringify({ error: 'Missing projectName' }), {
+        status: 400,
+        headers: { 'Access-Control-Allow-Origin': '*' },
+      });
+    }
 
     if (!emailData) {
+      console.error('❌ Missing emailData in request body');
       return new NextResponse(JSON.stringify({ error: 'Missing emailData' }), {
         status: 400,
         headers: { 'Access-Control-Allow-Origin': '*' },
       });
     }
 
-    console.log(`✅ Authenticated user: ${user.email}`);
-    console.log('📨 Received email data:', emailData);
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('name', projectName)
+      .eq('user_id', user.id)
+      .single();
+
+    if (projectError || !project) {
+      console.error(`❌ Project not found: ${projectName}`, projectError);
+      return new NextResponse(JSON.stringify({ error: 'Project not found' }), {
+        status: 404,
+        headers: { 'Access-Control-Allow-Origin': '*' },
+      });
+    }
+
+    console.log(`📁 Saving email to project: ${projectName} (id: ${project.id})`);
+    console.log(`📨 Received email data:`, emailData);
 
     return new NextResponse(JSON.stringify({ success: true, user: user.email }), {
       status: 200,

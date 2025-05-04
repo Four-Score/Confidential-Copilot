@@ -18,13 +18,26 @@ const EmailPreview: React.FC<EmailPreviewProps> = ({ emailData, entities, emailS
     setShowResponseEditor(true);
   };
 
-  const handleSaveToDashboard = () => {
-    if (emailSummary) {
-      uploadEmailSummariesToCopilotApp([emailSummary]); // <-- Send summary to your backend
-    } else {
+  const handleSaveToDashboard = async () => {
+    if (!emailSummary) {
       console.warn('No summary available to save.');
+      return;
     }
-  };
+  
+    const projectName = prompt('Enter the project name to save this email under:');
+    if (!projectName) {
+      alert('No project name provided.');
+      return;
+    }
+  
+    try {
+      await uploadEmailSummariesToCopilotApp([emailSummary], projectName);
+      alert(`Saved to project "${projectName}"`);
+    } catch (error) {
+      console.error('Failed to upload:', error);
+      alert('Upload failed.');
+    }
+  };  
 
   return (
     <div className="email-preview-wrapper">

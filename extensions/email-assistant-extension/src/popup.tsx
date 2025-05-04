@@ -11,11 +11,17 @@ const PopupApp: React.FC = () => {
 
   const handleAnalyzeEmail = () => {
     if (!isConnected) return;
+  
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      chrome.tabs.sendMessage(tabs[0].id!, { action: 'analyzeCurrentEmail' });
+      const tab = tabs[0];
+      if (tab && tab.id !== undefined) {
+        chrome.tabs.sendMessage(tab.id, { action: 'analyzeCurrentEmail' });
+      } else {
+        console.warn('No active tab or tab ID found');
+      }
     });
   };
-
+  
   const handleOpenDashboard = () => {
     chrome.runtime.openOptionsPage();
   };
@@ -37,6 +43,7 @@ const PopupApp: React.FC = () => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
+            projectName: 'My Project',
             emailData: {
               subject: 'From extension',
               body: 'Test email payload',
