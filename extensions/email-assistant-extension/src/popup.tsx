@@ -1,36 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import './styles.css';
-import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  'https://tczdnhbosuoqmgkpqnaz.supabase.co'
-  ,'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRjemRuaGJvc3VvcW1na3BxbmF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM2NzUwMDAsImV4cCI6MjA1OTI1MTAwMH0.RCg2REt0dl56FxPuTE6E2pEpt_uf5i9V8sngHwwt9Bc'
-
-);
 const PopupApp: React.FC = () => {
-  const [status, setStatus] = useState<string>('Initializing...');
-  const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [savedEmails, setSavedEmails] = useState<number>(0);
+  const [status, setStatus] = useState('Initializing...');
+  const [isConnected, setIsConnected] = useState(false);
+  const [savedEmails, setSavedEmails] = useState(0);
   const [authStatus, setAuthStatus] = useState<string | null>(null);
 
-  useEffect(() => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const currentTab = tabs[0];
-      if (currentTab.url?.includes('mail.google.com')) {
-        setStatus('Connected to Gmail');
-        setIsConnected(true);
-
-        chrome.storage.local.get(['email_assistant_emails'], (result) => {
-          const emails = result.email_assistant_emails || [];
-          setSavedEmails(emails.length);
-        });
-      } else {
-        setStatus('Please open Gmail to use this extension');
-        setIsConnected(false);
-      }
-    });
-  }, []);
 
   const handleAnalyzeEmail = () => {
     if (!isConnected) return;
@@ -43,36 +20,51 @@ const PopupApp: React.FC = () => {
     chrome.runtime.openOptionsPage();
   };
 
-  const handleTestAuth = () => {
+  const handleTestAuth = async () => {
     chrome.storage.local.get('supabaseSession', async ({ supabaseSession }) => {
       if (!supabaseSession) {
         setAuthStatus('❌ No session found in storage');
         return;
       }
   
-      const { access_token, refresh_token } = supabaseSession;
+      console.log('🔑 Using token from storage:', supabaseSession.access_token); // <--- Confirm this
   
-      const { data, error } = await supabase.auth.setSession({
-        access_token,
-        refresh_token,
-      });
+      try {
+        const res = await fetch('http://localhost:3000/api/email-mode/receive', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseSession.access_token}`, // ✅ Use correct token
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            emailData: {
+              subject: 'From extension',
+              body: 'Test email payload',
+            },
+          }),
+        });
   
-      if (error) {
-        setAuthStatus(`❌ Failed to set session: ${error.message}`);
-        return;
-      }
-  
-      const result = await supabase.auth.getUser();
-  
-      if (result.error) {
-        setAuthStatus(`❌ Failed to get user: ${result.error.message}`);
-      } else {
-        setAuthStatus(`✅ Logged in as: ${result.data.user?.email}`);
-        console.log('User:', result.data.user);
+        const data = await res.json();
+        if (!res.ok) {
+          setAuthStatus(`❌ Server rejected: ${res.status} ${data?.error}`);
+        } else {
+          setAuthStatus(`✅ Success: ${JSON.stringify(data)}`);
+        }
+      } catch (err) {
+        console.error(err);
+        setAuthStatus('❌ Network or server error');
       }
     });
   };
-
+  chrome.storage.local.get('supabaseSession', ({ supabaseSession }) => {
+    if (!supabaseSession) {
+      console.warn('No session found');
+      return;
+    }
+  
+    console.log('📦 Supabase session:', supabaseSession);
+  });
+  
   return (
     <div className="p-4 bg-white">
       <div className="flex items-center justify-between mb-4">

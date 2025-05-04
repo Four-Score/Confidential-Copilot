@@ -1,25 +1,26 @@
 const API_URL = 'http://localhost:3000/api/email-mode/receive'; // Dev mode
-
-const EMAIL_EXTENSION_SECRET = 'teamsAERA'; // Must match server secret
-
 export async function uploadEmailSummariesToCopilotApp(emailSummaries: string[]) {
+  chrome.storage.local.get('supabaseSession', async ({ supabaseSession }) => {
+    const accessToken = supabaseSession?.access_token;
+    if (!accessToken) {
+      console.error('❌ No access token found');
+      return;
+    }
+
     try {
-      const response = await fetch(API_URL, {
+      const response = await fetch('http://localhost:3000/api/email-mode/receive', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${EMAIL_EXTENSION_SECRET}`,
+          'Authorization': `Bearer ${accessToken}`, // ✅ Correct token
         },
-        body: JSON.stringify({
-          emailSummaries: emailSummaries, // Only sending summaries
-        }),
+        body: JSON.stringify({ emailData: emailSummaries }),
       });
-  
+
       const result = await response.json();
-      console.log('Upload successful:', result.message);
-  
+      console.log('✅ Upload successful:', result);
     } catch (error) {
-      console.error('Failed to upload email summaries:', error);
+      console.error('❌ Failed to upload email summaries:', error);
     }
-  }
-  
+  });
+}
