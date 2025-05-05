@@ -28,6 +28,7 @@ export default function ProjectPage() {
   const [uploadedDocument, setUploadedDocument] = useState<Document | null>(null);
   const [uploadedWebsite, setUploadedWebsite] = useState<UnencryptedDocument | null>(null);
   const [currentUrl, setCurrentUrl] = useState<string | null>(null);
+  const [isMeetingMode, setIsMeetingMode] = useState(false);
   
   // Get encryption service
   const { service: encryptionService, isLoading: isEncryptionLoading } = useKeyManagement();
@@ -238,7 +239,10 @@ export default function ProjectPage() {
         <h2 className="text-xl font-semibold text-gray-900 mb-6">Add Data to Your Project</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <button
-            onClick={() => setShowUploader(true)}
+            onClick={() => {
+              setIsMeetingMode(false);
+              setShowUploader(true);
+            }}
             className="flex flex-col items-center justify-center p-4 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-blue-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -282,14 +286,17 @@ export default function ProjectPage() {
           </button>
           
           <button
-            className="flex flex-col items-center justify-center p-4 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 rounded-lg transition-colors cursor-not-allowed opacity-70"
-            disabled
+            className="flex flex-col items-center justify-center p-4 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 rounded-lg transition-colors"
+            onClick={() => {
+              setIsMeetingMode(true);
+              setShowUploader(true);
+            }}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-yellow-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
             </svg>
             <span className="text-sm font-medium text-gray-800">Meeting Transcripts</span>
-            <span className="text-xs text-gray-500 text-center mt-1">Import meeting data</span>
+            <span className="text-xs text-gray-500 text-center mt-1">Import meeting data (.txt allowed)</span>
           </button>
         </div>
       </div>
@@ -400,6 +407,7 @@ export default function ProjectPage() {
               projectId={projectId} 
               onUploadComplete={handleDocumentUpload} 
               onCancel={handleUploadCancel} 
+              isMeetingMode={isMeetingMode}
             />
           </div>
         )}

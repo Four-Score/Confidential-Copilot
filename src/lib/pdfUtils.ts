@@ -21,30 +21,18 @@ export const DEFAULT_CHUNK_SIZE = 1000;
 export const DEFAULT_CHUNK_OVERLAP = 200;
 
 /**
- * Validates if a file is a PDF and within size limits
+ * Validates if a file is a PDF or TXT and within size limits
  * @param file File to validate
+ * @param maxFileSize Maximum file size in bytes
  * @returns Object containing validation result and error message if any
  */
-export function validatePdfFile(file: File): { 
-  valid: boolean; 
-  error?: string;
-} {
-  // Check if file is a PDF
-  if (file.type !== 'application/pdf') {
-    return { 
-      valid: false, 
-      error: 'Only PDF files are supported.' 
-    };
+export function validatePdfFile(file: File, maxFileSize = MAX_FILE_SIZE): { valid: boolean; error?: string } {
+  if (file.type !== 'application/pdf' && file.type !== 'text/plain') {
+    return { valid: false, error: 'Only PDF and TXT files are supported.' };
   }
-
-  // Check file size
-  if (file.size > MAX_FILE_SIZE) {
-    return { 
-      valid: false, 
-      error: `File size exceeds the maximum allowed size (${MAX_FILE_SIZE / (1024 * 1024)}MB).` 
-    };
+  if (file.size > maxFileSize) {
+    return { valid: false, error: `File size exceeds maximum allowed (${maxFileSize / (1024 * 1024)}MB).` };
   }
-
   return { valid: true };
 }
 
@@ -234,6 +222,47 @@ export async function processPdfFile(
     return {
       valid: false,
       error: `Failed to process PDF: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+}
+
+/**
+ * Complete end-to-end function to process a TXT file:
+ * extracts text and chunks the text
+ * @param file TXT file to process
+ * @param documentId Optional document ID to include in metadata
+ * @param chunkSize Size of each chunk
+ * @param chunkOverlap Overlap between consecutive chunks
+ * @returns Object containing validation status, metadata, and chunks
+ */
+export async function processTxtFile(
+  file: File,
+  documentId?: string,
+  chunkSize = DEFAULT_CHUNK_SIZE,
+  chunkOverlap = DEFAULT_CHUNK_OVERLAP
+): Promise<{
+  valid: boolean;
+  error?: string;
+  metadata?: { pageCount: number };
+  chunks?: DocumentChunk[];
+}> {
+  try {
+    const text = await file.text();
+    const chunks = await chunkText(
+      text,
+      { fileName: file.name, documentId },
+      chunkSize,
+      chunkOverlap
+    );
+    return {
+      valid: true,
+      metadata: { pageCount: 1 },
+      chunks,
+    };
+  } catch (error) {
+    return {
+      valid: false,
+      error: `Failed to process TXT: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
   }
 }
