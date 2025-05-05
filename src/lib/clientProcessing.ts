@@ -76,6 +76,10 @@ export interface WebsiteProcessingResult {
   };
 }
 
+export interface YoutubeProcessingOptions {
+  signal?: AbortSignal;
+  onProgress?: (event: ProcessingProgressEvent) => void;
+}
 
 /**
  * Process document using client-side processing
@@ -550,4 +554,36 @@ export async function processWebsite(
       error: error instanceof Error ? error.message : 'Unknown error' 
     };
   }
+}
+
+export async function processYoutubeTranscript(
+  projectId: string,
+  transcript: string,
+  videoId: string,
+  videoUrl: string,
+  title?: string,
+  options?: YoutubeProcessingOptions // add options for progress/cancel
+) {
+  const jobId = uuidv4();
+  const onProgress = options?.onProgress || (() => {});
+  const signal = options?.signal;
+
+  // Helper for reporting progress
+  const reportProgress = (
+    status: ProcessingStatus,
+    progress: number,
+    currentStep?: string
+  ) => {
+    const event: ProcessingProgressEvent = {
+      jobId,
+      status,
+      progress,
+      currentStep: currentStep || '',
+    };
+    onProgress(event);
+    return updateProcessingProgress(jobId, progress, status, currentStep, 'youtube');
+  };
+
+  await reportProgress('initialized', 0, 'Starting YouTube ingestion');
+  // ...stepwise: validating, extracting, chunking, embedding, uploading, completed
 }

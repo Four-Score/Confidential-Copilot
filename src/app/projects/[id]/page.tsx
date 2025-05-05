@@ -13,6 +13,7 @@ import { Document, UnencryptedDocument } from '@/types/document';
 import { useKeyManagement } from '@/services/keyManagement';
 import { useDocumentProcessor } from '@/hooks/useDocumentProcessor';
 import YoutubePreview from '@/components/youtube/YoutubePreview';
+
 export default function ProjectPage() {
   const params = useParams();
   const projectId = params.id as string;
@@ -198,6 +199,38 @@ export default function ProjectPage() {
       setShowYoutubeInput(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch transcript');
+    }
+  };
+
+  const handleYoutubeIngest = async () => {
+    if (!youtubeVideoId || !youtubeTranscript) return;
+    try {
+      const response = await fetch(`/api/projects/${projectId}/youtube-ingest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          videoId: youtubeVideoId,
+          transcript: youtubeTranscript,
+          metadata: {
+            title: 'Video Title',
+            url: `https://www.youtube.com/watch?v=${youtubeVideoId}`,
+          },
+          chunks: [], // Processed transcript chunks, if required
+        }),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to ingest YouTube data');
+      }
+      // Optionally refresh documents or show a success message
+      setYoutubeTranscript(null);
+      setYoutubeVideoId(null);
+      // Optionally, refresh the project data to show the new document
+      // await fetchProjectData();
+      handleBackToProject();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to ingest YouTube data');
     }
   };
 
@@ -429,6 +462,7 @@ export default function ProjectPage() {
             videoId={youtubeVideoId}
             transcript={youtubeTranscript}
             onBack={handleBackToProject}
+            onConfirm={handleYoutubeIngest}
           />
         </div>
       </div>
