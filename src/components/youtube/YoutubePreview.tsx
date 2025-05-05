@@ -1,0 +1,37 @@
+import React from 'react';
+
+interface YoutubePreviewProps {
+  videoId: string;
+  transcript: string;
+  onBack: () => void;
+}
+
+export default function YoutubePreview({ videoId, transcript, onBack }: YoutubePreviewProps) {
+  return (
+    <div className="bg-white shadow-lg rounded-lg p-6 mb-8">
+      <div className="aspect-video rounded-md overflow-hidden bg-gray-100 mb-4">
+        <iframe
+          width="100%"
+          height="100%"
+          src={`https://www.youtube.com/embed/${videoId}`}
+          title="YouTube video player"
+          frameBorder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        ></iframe>
+      </div>
+      <h3 className="text-lg font-semibold mb-2">Transcript</h3>
+      <div className="bg-gray-50 rounded p-4 text-sm text-gray-800" style={{ maxHeight: 300, overflowY: 'auto' }}>
+        {transcript}
+      </div>
+      <div className="flex justify-end mt-4">
+        <button
+          onClick={onBack}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Back to Project
+        </button>
+      </div>
+    </div>
+  );
+}
