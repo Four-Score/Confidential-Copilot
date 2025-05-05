@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { 
   processPdfFile,
+  processTxtFile,
   validatePdfFile, 
   DocumentChunk, 
   PDFExtractionResult 
@@ -137,23 +138,34 @@ export async function processDocument(
       throw new Error('Operation cancelled by user');
     }
     
-    // STEP 1: Extract text and metadata from PDF
-    await reportProgress('extracting', 5, 'Extracting text from PDF');
+    // STEP 1: Extract text and metadata from file
+    await reportProgress('extracting', 5, 'Extracting text from file');
     
     let extractionResult;
     try {
-      extractionResult = await processPdfFile(
-        file, 
-        jobId, // Pass the jobId as documentId
-        config.chunkSize,
-        config.chunkOverlap
-      );
+      if (file.type === 'application/pdf') {
+        extractionResult = await processPdfFile(
+          file, 
+          jobId, // Pass the jobId as documentId
+          config.chunkSize,
+          config.chunkOverlap
+        );
+      } else if (file.type === 'text/plain') {
+        extractionResult = await processTxtFile(
+          file, 
+          jobId, // Pass the jobId as documentId
+          config.chunkSize,
+          config.chunkOverlap
+        );
+      } else {
+        throw new Error('Only PDF and TXT files are supported.');
+      }
       
       if (!extractionResult.valid || !extractionResult.chunks || !extractionResult.metadata) {
-        throw new Error(extractionResult.error || 'Failed to process PDF');
+        throw new Error(extractionResult.error || 'Failed to process file');
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'PDF extraction failed';
+      const errorMessage = error instanceof Error ? error.message : 'File extraction failed';
       await reportProgress('error', 0, errorMessage);
       throw error;
     }
@@ -257,7 +269,7 @@ export async function processDocument(
     const uploadPayload = {
       name: encryptedName,
       originalName: encryptedMetadata.originalName,
-      type: 'pdf',
+      type: file.type === 'application/pdf' ? 'pdf' : 'txt',
       fileSize: file.size,
       pageCount: encryptedMetadata.pageCount,
       encryptedContent,
