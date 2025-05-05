@@ -1,0 +1,48 @@
+CREATE OR REPLACE FUNCTION match_v2_document_chunks(
+  query_embedding VECTOR(384),
+  match_threshold FLOAT,
+  match_count INT,
+  user_id UUID,
+  project_id UUID,
+  optional_doc_ids UUID[] DEFAULT NULL
+)
+RETURNS TABLE (
+  chunk_id UUID,
+  document_id UUID,
+  document_name TEXT,
+  document_type TEXT,
+  chunk_number INTEGER,
+  chunk_content TEXT,
+  metadata JSON,
+  similarity FLOAT
+)
+LANGUAGE SQL STABLE
+AS $$
+  SELECT
+    vc.id AS chunk_id,
+    vc.document_id,
+    d.name AS document_name,
+    d.type AS document_type,
+    vc.chunk_number,
+    vc.chunk_content,
+    vc.metadata,
+    1 - (vc.encrypted_embeddings <=> query_embedding) AS similarity
+  FROM 
+    public.v2_vector_chunks vc
+  JOIN 
+    public.v2_documents d ON vc.document_id = d.id
+  JOIN 
+    public.projects p ON d.project_id = p.id
+  WHERE 
+    p.user_id = user_id
+    AND d.project_id = project_id
+    AND (optional_doc_ids IS NULL OR vc.document_id = ANY(optional_doc_ids))
+    AND 1 - (vc.encrypted_embeddings <=> query_embedding) > match_threshold
+  ORDER BY 
+    similarity DESC
+  LIMIT 
+    LEAST(match_count, 200);
+$$;
+
+-- Grant access to authenticated users
+GRANT EXECUTE ON FUNCTION match_v2_document_chunks TO authenticated;

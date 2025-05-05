@@ -59,3 +59,30 @@ export interface WebsiteChunkMetadata {
   startPosition: number;
   endPosition: number;
 }
+
+// Search result for a document
+export interface DocumentWithSimilarity extends Document {
+  similarity?: number;
+  matchedChunks?: {
+    chunkId: string;
+    chunkNumber: number;
+    similarity: number;
+    encryptedContent: string;
+    metadata: any;
+  }[];
+}
+
+// Search result for an unencrypted document
+export interface UnencryptedDocumentWithSimilarity extends UnencryptedDocument {
+  similarity?: number;
+  matchedChunks?: {
+    chunkId: string;
+    chunkNumber: number;
+    similarity: number;
+    content: string;
+    metadata: any;
+  }[];
+}
+
+// Union type for either document type with similarity information
+export type DocumentSearchResult = DocumentWithSimilarity | UnencryptedDocumentWithSimilarity;
