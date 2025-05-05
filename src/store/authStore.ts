@@ -182,51 +182,64 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const supabase = createClient(); // Browser client
 
         try {
-            // First check if we have a user from the direct authentication request
-            const { data: { user }, error } = await supabase.auth.getUser();
-
-            // If there's an error related to missing session/refresh token, this is normal for new visitors
-            // So we'll handle it quietly without showing errors to the user
-            if (error) {
-                if (error.message?.includes("Auth session missing") || 
-                   error.message?.includes("Refresh Token Not Found") ||
-                   error.name === "AuthSessionMissingError") {
-                    // This is an expected case for users who haven't logged in yet
+            // Get existing session
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            
+            if (sessionError) {
+                if (sessionError.message?.includes("Auth session missing") || 
+                   sessionError.message?.includes("Refresh Token Not Found") ||
+                   sessionError.name === "AuthSessionMissingError") {
                     console.log("No active session found - user not logged in");
                     set({ user: null, session: null, isLoading: false, error: null });
                     return;
                 }
                 
-                // For other types of errors, we'll log them as before
-                console.error("Error fetching auth user:", error);
+                console.error("Error fetching auth session:", sessionError);
                 set({ user: null, session: null, isLoading: false, error: "Failed to initialize session." });
                 return;
             }
 
-            if (user) {
-                set({ user, session: null, isLoading: false });
-                console.log("User found:", user);
-
-                // Get user security key if it exists
-                const { data: userKeyData, error: userKeyError } = await supabase
-                    .from('user_keys')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .maybeSingle();
-
-                if (userKeyError) {
-                    console.error("Error fetching user key:", userKeyError);
-                } else if (userKeyData) {
-                    console.log("User key data found:", userKeyData);
-                } else {
-                    console.log("No user key data found.");
+            if (session) {
+                // Set user and session from existing session
+                set({ 
+                    user: session.user,
+                    session: session
+                });
+                
+                try {
+                    // Attempt to load the user's encryption keys if session exists
+                    const userId = session.user.id;
+                    const keyData = await userDbService.fetchUserKeys(userId);
+                    
+                    if (keyData) {
+                        console.log('Found existing user keys, session restored');
+                        // Note: For security, we're not automatically loading the symmetric key
+                        // The user will need to log in again to decrypt the key
+                    } else {
+                        console.log("No user key data found.");
+                    }
+                } catch (error) {
+                    console.error('Error loading keys for existing session:', error);
+                    // Continue with authenticated session but without keys loaded
                 }
             } else {
-                set({ user: null, session: null, isLoading: false });
-                console.log("No user found.");
+                set({ user: null, session: null });
+                console.log("No active session found.");
             }
+            
+            // Set up the auth state change listener
+            const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
+                console.log("Auth state changed:", event);
+                if (currentSession) {
+                    set({ user: currentSession.user, session: currentSession });
+                } else {
+                    // Clear auth state and decrypted key when session is lost
+                    set({ user: null, session: null, decryptedSymmetricKey: null });
+                }
+            });
+            
+            set({ isLoading: false });
         } catch (error: any) {
-            // Check if this is a session-missing error, which is normal for new visitors
             if (error.message?.includes("Auth session missing") || 
                 error.name === "AuthSessionMissingError") {
                 console.log("No active session found - user not logged in");
@@ -235,11 +248,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             }
             
             console.error("Error initializing auth:", error);
-            set({ user: null, session: null, isLoading: false, error: "Failed to initialize session." });
+            set({ 
+                user: null, 
+                session: null, 
+                isLoading: false, 
+                error: error instanceof Error ? error.message : "Failed to initialize session." 
+            });
         }
     },
-
-   
     //  Logs in an existing user.
     //  @param email - The user's email address.
     //  @param password - The user's password.

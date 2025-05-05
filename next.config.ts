@@ -6,6 +6,19 @@ const nextConfig: NextConfig = {
   experimental: {
     // Turbopack disabled by default 
   },
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, max-age=0',
+          },
+        ],
+      },
+    ];
+  },
   webpack: (config, { isServer }) => {
     if (!isServer) {
       // Provide fallbacks for Node.js core modules
