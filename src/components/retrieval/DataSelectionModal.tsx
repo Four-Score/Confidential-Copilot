@@ -53,7 +53,7 @@ export const DataSelectionModal: React.FC = () => {
   const [encryptedDocuments, setEncryptedDocuments] = useState<Document[]>([]);
   const [unencryptedDocuments, setUnencryptedDocuments] = useState<Document[]>([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
-
+      
   // Effect to fetch project data
   useEffect(() => {
     if (!selectedProjectId) return;

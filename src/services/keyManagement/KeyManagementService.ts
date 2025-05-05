@@ -269,6 +269,56 @@ export class KeyManagementService {
     if (!this.ensureInitialized()) throw new Error('Service not initialized');
     return this.dcpeProvider.decryptMetadata(encryptedMetadata);
   }
+
+  /**
+ * Decrypts multiple text items in a single batch operation
+ * @param encryptedTexts Array of encrypted text strings
+ * @returns Array of decrypted text strings in the same order
+ */
+public decryptTextBatch(encryptedTexts: string[]): string[] {
+  // Validate input
+  if (!encryptedTexts || !encryptedTexts.length) return [];
+  
+  // Check if service is initialized
+  if (!this.ensureInitialized()) {
+    throw new Error('DCPE provider is not initialized');
+  }
+  
+  // Process each text, capturing errors per item
+  return encryptedTexts.map(text => {
+    try {
+      return this.dcpeProvider.decryptText(text);
+    } catch (error) {
+      console.error('Failed to decrypt text:', error);
+      return ''; // Return empty string for failed items
+    }
+  });
+}
+
+/**
+ * Decrypts multiple metadata items in a single batch operation
+ * @param encryptedMetadataItems Array of encrypted metadata items
+ * @returns Array of decrypted metadata items in the same order
+ */
+public decryptMetadataBatch(encryptedMetadataItems: any[]): any[] {
+  // Validate input
+  if (!encryptedMetadataItems || !encryptedMetadataItems.length) return [];
+  
+  // Check if DCPE provider is initialized
+  if (!this.ensureInitialized) {
+    throw new Error('DCPE provider is not initialized');
+  }
+  
+  // Process each metadata item, capturing errors per item
+  return encryptedMetadataItems.map(item => {
+    try {
+      return this.dcpeProvider.decryptMetadata(item);
+    } catch (error) {
+      console.error('Failed to decrypt metadata:', error);
+      return {}; // Return empty object for failed items
+    }
+  });
+}
   
   /**
    * Encrypt vector using DCPE

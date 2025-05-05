@@ -112,6 +112,12 @@ export const SelectableDocumentCard: React.FC<SelectableDocumentCardProps> = ({
         try {
           // Use decryptMetadata instead of decryptText for document names
           // Document names are encrypted using encryptMetadata, not encryptText
+          if (!keyManagementService.isInitialized()) {
+            console.log("Key Management Service not initialized yet, skipping decryption");
+            setDisplayName(document.name || 'Encrypted Document');
+            return;
+          }
+          
           const decryptedName = await keyManagementService.decryptMetadata(document.name);
           setDisplayName(decryptedName || 'Untitled Document');
         } catch (error) {

@@ -211,8 +211,8 @@ Modal for searching across selected documents:
 - Empty state messaging for initial view
 - Visual feedback during search operations
 - Separates selected documents by type for vector search preparation:
-  - Encrypted document IDs for `match_document_chunks` function
-  - Unencrypted document IDs for `match_v2_document_chunks` function
+  - Encrypted document IDs for `match_document_chunks` function (to be implemented)
+  - Unencrypted document IDs for `match_v2_document_chunks` function (to be implemented)
 - Back navigation using `goBack` function
 - Logs search parameters for future implementation
 - Prepares structure for vector search integration
