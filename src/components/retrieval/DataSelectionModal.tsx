@@ -110,8 +110,9 @@ export const DataSelectionModal: React.FC = () => {
       }
     };
     
+    
     fetchProjectData();
-  }, [selectedProjectId]);
+  }, [selectedProjectId, isModalOpen, modalProps.currentView]);
 
   // Check if all documents are selected - more efficient check
   useEffect(() => {
