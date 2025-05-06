@@ -56,7 +56,10 @@ export const DataSelectionModal: React.FC = () => {
       
   // Effect to fetch project data
   useEffect(() => {
-    if (!selectedProjectId) return;
+    // Only fetch when modal is actually open AND we have a project ID
+    const isOpen = isModalOpen && modalProps.currentView === MODAL_ROUTES.DATA_SELECTION;
+    
+    if (!selectedProjectId || !isOpen) return;
     
     const fetchProjectData = async () => {
       setIsLoading(true);
