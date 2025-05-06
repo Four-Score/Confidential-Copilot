@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { useAuthStore } from '@/store/authStore';
+import { chunkText } from '@/lib/pdfUtils';
 import { generateBatchEmbeddings } from '@/lib/embeddingUtils';
 import { useKeyManagement } from '@/services/keyManagement/useKeyManagement';
 
@@ -21,61 +22,26 @@ interface EmailQueueItem {
   projectId: string;
 }
 
-// ✅ Text chunking logic (moved from pdfUtils)
-function chunkText(
-  text: string,
-  metadata: { fileName: string; documentId?: string },
-  chunkSize = 1000,
-  chunkOverlap = 200
-) {
-  const chunks = [];
-  let start = 0;
-  let chunkNumber = 1;
-
-  while (start < text.length) {
-    const end = Math.min(start + chunkSize, text.length);
-    const chunkText = text.slice(start, end);
-
-    chunks.push({
-      content: chunkText,
-      metadata: {
-        chunkNumber,
-        fileName: metadata.fileName,
-        documentId: metadata.documentId,
-      },
-    });
-
-    chunkNumber++;
-    start += chunkSize - chunkOverlap;
-  }
-
-  return chunks;
-}
-
 export default function EmailSummarizerPage() {
   const router = useRouter();
   const { user } = useAuthStore();
   const { service: keyService, isLoading } = useKeyManagement();
   const pendingQueue = useRef<EmailQueueItem[] | null>(null);
 
-  // 🧠 Prevent duplicate processing
-  const processedEmailIds = useRef<Set<string>>(new Set());
-
   useEffect(() => {
     if (!user) router.push('/log-in');
   }, [user]);
 
-  // ✅ Receive email queue from extension via iframe
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (
         event.origin !== 'chrome-extension://kfllijpookcgihkcclkjeobcdcejcmlb' ||
         event.data?.type !== 'EMAIL_QUEUE_SYNC'
-      ) return;
+      )
+        return;
 
       const queue = event.data.data as EmailQueueItem[];
       console.log('✅ Received email queue from extension:', queue);
-
       pendingQueue.current = queue;
     };
 
@@ -83,20 +49,14 @@ export default function EmailSummarizerPage() {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  // ✅ Process queue on load (only once per email ID)
   useEffect(() => {
     const processQueue = async () => {
       const queue = pendingQueue.current;
       if (!queue || !keyService || isLoading) return;
 
       for (const email of queue) {
-        if (processedEmailIds.current.has(email.id)) {
-          console.log(`⏩ Skipping already-processed email: ${email.subject}`);
-          continue;
-        }
-
         try {
-          const chunks = chunkText(email.body, {
+          const chunks = await chunkText(email.body, {
             fileName: email.subject,
             documentId: email.id,
           });
@@ -139,7 +99,6 @@ export default function EmailSummarizerPage() {
 
           if (res.ok) {
             console.log(`✅ Ingested email: ${email.subject}`);
-            processedEmailIds.current.add(email.id); // ✅ Mark as processed
           } else {
             console.error(`❌ Failed to upload ${email.subject}`);
           }
@@ -148,11 +107,16 @@ export default function EmailSummarizerPage() {
         }
       }
 
+      // ✅ Clear local queue
       pendingQueue.current = null;
       chrome.storage?.local?.set?.({ email_queue: [] });
 
+      // ✅ Notify extension to clear its own queue
       const iframe = document.getElementById('email-sync-iframe') as HTMLIFrameElement;
-      iframe?.contentWindow?.postMessage({ type: 'CLEAR_EMAIL_QUEUE' }, 'chrome-extension://kfllijpookcgihkcclkjeobcdcejcmlb');
+      iframe?.contentWindow?.postMessage(
+        { type: 'CLEAR_EMAIL_QUEUE' },
+        'chrome-extension://kfllijpookcgihkcclkjeobcdcejcmlb'
+      );
       console.log('✅ Sent CLEAR_EMAIL_QUEUE message to extension');
     };
 
@@ -167,10 +131,12 @@ export default function EmailSummarizerPage() {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-4">Email Summarizer</h1>
-      <p className="mb-4 text-gray-600">Connect your browser extension to start sending email summaries.</p>
+      <p className="mb-4 text-gray-600">
+        Connect your browser extension to start sending email summaries.
+      </p>
       <Button onClick={handleConnectExtension}>Connect to Extension</Button>
 
-      {/* Hidden iframe for extension sync */}
+      {/* Hidden iframe to sync with extension */}
       <iframe
         src="chrome-extension://kfllijpookcgihkcclkjeobcdcejcmlb/sync.html"
         id="email-sync-iframe"

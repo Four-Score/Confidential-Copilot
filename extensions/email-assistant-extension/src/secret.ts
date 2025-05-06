@@ -1,2 +1,2 @@
 // src/secrets.ts
-export const GROQ_API_KEY ='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';
+export const GROQ_API_KEY ='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';
