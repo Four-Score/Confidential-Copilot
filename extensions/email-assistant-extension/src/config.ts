@@ -19,7 +19,7 @@ export const config = {
   },
 
   env: {
-    GROQ_API_KEY: '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',
+    GROQ_API_KEY: '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',
   },
 };
 

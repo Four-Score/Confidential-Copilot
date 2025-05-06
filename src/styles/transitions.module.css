@@ -1,0 +1,76 @@
+.slideInRight {
+  animation: slideInRight 0.3s ease forwards;
+  width: 100%;
+}
+
+.slideOutLeft {
+  animation: slideOutLeft 0.3s ease forwards;
+  width: 100%;
+}
+
+.slideInLeft {
+  animation: slideInLeft 0.3s ease forwards;
+  width: 100%;
+}
+
+.slideOutRight {
+  animation: slideOutRight 0.3s ease forwards;
+  width: 100%;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutLeft {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-30px);
+    opacity: 0;
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(30px);
+    opacity: 0;
+  }
+}
+
+/* These classes are no longer needed and could cause positioning issues */
+/* .modalContainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.modalOverlay {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+} */

@@ -12,12 +12,14 @@ interface DocumentUploaderProps {
   projectId: string;
   onUploadComplete: (document: Document) => void;
   onCancel: () => void;
+  isMeetingMode?: boolean; // <-- add this line
 }
 
 export default function DocumentUploader({ 
   projectId, 
   onUploadComplete, 
-  onCancel 
+  onCancel,
+  isMeetingMode = false // <-- add this line
 }: DocumentUploaderProps) {
   const [file, setFile] = useState<File | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -108,8 +110,8 @@ export default function DocumentUploader({
           progress={progress}
           currentStep={status || ''}
           error={error}
-          acceptedFileTypes={['application/pdf']}
-          dropzoneText="Drop your PDF here or click to browse"
+          acceptedFileTypes={isMeetingMode ? ['application/pdf', 'text/plain'] : ['application/pdf']}
+          dropzoneText={isMeetingMode ? "Drop your PDF or TXT here or click to browse" : "Drop your PDF here or click to browse"}
         />
         
         {file && !isProcessing && (

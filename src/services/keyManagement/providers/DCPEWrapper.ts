@@ -51,8 +51,28 @@ export class DCPEWrapper implements DCPEProvider {
    * Decrypt text using DCPE
    */
   decryptText(encryptedText: string): string {
-    if (!this.dcpe) throw new Error('DCPE not initialized');
-    return this.dcpe.decryptText(encryptedText);
+    try {
+      // Parse the JSON string to get the object representation
+      const encryptedData = JSON.parse(encryptedText);
+      
+      // Convert the data arrays to Buffer objects
+      const ciphertext = Buffer.from(encryptedData.ciphertext.data);
+      const iv = Buffer.from(encryptedData.iv.data);
+      const tag = Buffer.from(encryptedData.tag.data);
+      
+      // Create the formatted object expected by DCPE
+      const formattedEncryptedText = {
+        ciphertext,
+        iv,
+        tag
+      };
+      
+      // Use the properly formatted encrypted text
+      return this.dcpe.decryptText(formattedEncryptedText);
+    } catch (error) {
+      console.error('DCPEWrapper decryptText error:', error);
+      throw error;
+    }
   }
   
   /**

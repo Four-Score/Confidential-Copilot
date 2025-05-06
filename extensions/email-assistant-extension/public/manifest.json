@@ -30,14 +30,18 @@
     }
   ],
   "web_accessible_resources": [
-  {
-    "resources": ["assets/*"],
-    "matches": ["https://mail.google.com/*"]
-  },
-  {
-    "resources": ["auth.html"],
-    "matches": ["<all_urls>"]
-  }
+    {
+      "resources": ["assets/*"],
+      "matches": ["https://mail.google.com/*"]
+    },
+    {
+      "resources": ["auth.html"],
+      "matches": ["<all_urls>"]
+    },
+    {
+      "resources": ["sync.html", "sync.js"],  
+      "matches": ["<all_urls>"]
+    }
   ],
   "oauth2": {
     "client_id": "574622732867-d7eq9v1skfclr3503hi29klekn4rjr9u.apps.googleusercontent.com",
