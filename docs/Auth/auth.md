@@ -12,6 +12,7 @@ This authentication system is designed with security by design and zero-trust pr
 - DCPE Keys: A set of keys used for Deterministic Convergent Privacy Encryption, which enables searchable encryption while maintaining security. These keys are encrypted with the user's symmetric key and stored in both the database and localStorage for cross-device consistency.
 - Salt: A random value used to protect against rainbow table attacks.
 - Initialization Vector (IV): A random value used to ensure that the same plaintext encrypts to different ciphertexts.
+- Session Storage: Browser-based storage used to securely persist symmetric keys across page refreshes and tabs while maintaining the same security guarantees.
 
 ## 3. Authentication Flow
 
@@ -25,6 +26,7 @@ This authentication system is designed with security by design and zero-trust pr
    - Once with the recovery key
 5. The encrypted symmetric keys, IVs, and salt are stored in the Supabase database.
 6. The recovery key is displayed to the user, who is prompted to save it securely.
+7. The symmetric key is stored securely in session storage for persistence across page refreshes.
 
 ### Login
 
@@ -33,15 +35,22 @@ This authentication system is designed with security by design and zero-trust pr
 3. The client fetches the encrypted key material (encrypted symmetric keys, IVs, and salt) from the Supabase database.
 4. The password-derived key is generated from the password and salt.
 5. The symmetric key is decrypted using the password-derived key.
-6. The decrypted symmetric key is stored in memory.
+6. The decrypted symmetric key is stored in memory and securely in session storage.
 7. The Key Management Service is initialized with the user ID and decrypted symmetric key.
 8. The service loads or generates DCPE keys for deterministic encryption.
 
 ### Logout
 
 1. The client signs the user out of Supabase Auth.
-2. The decrypted symmetric key is cleared from memory.
+2. The decrypted symmetric key is cleared from memory and session storage.
 3. The Key Management Service is cleared of all keys and state.
+
+### Session Persistence
+
+1. When refreshing the page or opening a new tab, the application checks session storage for a saved symmetric key.
+2. If found, the symmetric key is retrieved and used to initialize the Key Management Service without requiring password re-entry.
+3. If not found (new browser tab), the user is prompted to enter their password to decrypt the key.
+4. This process maintains security while providing a seamless user experience.
 
 ### Recovery
 
@@ -49,8 +58,16 @@ This authentication system is designed with security by design and zero-trust pr
 2. The client fetches the encrypted key material (encrypted symmetric key, IV, and salt) from the Supabase database.
 3. The recovery-key-based key is generated from the recovery key and salt.
 4. The symmetric key is decrypted using the recovery-key-based key.
-5. The decrypted symmetric key is stored in memory.
+5. The decrypted symmetric key is stored in memory and securely in session storage.
 6. The Key Management Service is initialized with the user ID and decrypted symmetric key.
+
+### Password Recovery
+
+1. When a user opens a new tab or browser and their encryption key is not available, a password prompt modal appears.
+2. The user enters their password.
+3. The system retrieves the key data from the database and derives the wrapping key from the password.
+4. The symmetric key is decrypted and stored in memory and session storage.
+5. The Key Management Service is initialized, allowing the user to access their encrypted data.
 
 ### Password Reset
 
@@ -66,14 +83,18 @@ This authentication system is designed with security by design and zero-trust pr
 
 - Key Generation: All cryptographic keys are generated client-side using cryptographically secure random number generators.
 - Key Storage: Only encrypted key material is stored in the Supabase database. The actual symmetric key and password are never stored on the server.
+- Key Persistence: The symmetric key is securely stored in session storage to persist across page refreshes while maintaining security.
+- Key Recovery: Multiple mechanisms exist for recovering access to encryption keys, including password re-entry and recovery key usage.
 - Key Rotation: The password reset process effectively rotates the password-derived key.
-- Key Destruction: The decrypted symmetric key is cleared from memory on logout or session expiry.
+- Key Destruction: The decrypted symmetric key is cleared from memory and session storage on logout or session expiry.
 - DCPE Key Management: The Key Management Service handles the storage, retrieval, and synchronization of DCPE keys across devices, always keeping them encrypted with the symmetric key.
 
 ## 5. Security Considerations
 
 - Password Strength: Users should be encouraged to use strong, unique passwords.
 - Recovery Key Security: Users should be educated about the importance of securely storing their recovery key.
+- Session Storage Security: While session storage provides convenience, it's limited to the current browser session and is cleared when the browser is closed.
+- Cross-Tab Security: Opening a new tab requires re-authentication for security, as session storage is not shared between tabs.
 - Supabase Security: The Supabase project should be configured with appropriate security measures, such as network restrictions and regular security audits.
 - Code Security: The client-side code should be regularly reviewed for security vulnerabilities.
 
@@ -85,19 +106,30 @@ src/
 │        └── route.ts # API route through Supabase to check user exists 
 ├── app/
 ├── components/
-├── features/
+│   └── auth/
+│       ├── LoginForm.tsx # Login form component
+│       ├── PasswordPromptModal.tsx # Modal for password recovery
+│       ├── PasswordRequirements.tsx # Password requirements display
+│       ├── RecoveryKeyDisplay.tsx # Recovery key display component
+│       └── SignUpForm.tsx # Signup form component
+├── contexts/
+│   └── PasswordModalContext.tsx # Context for managing password modal state
 ├── lib/
 │   ├── crypto.ts # Client-side crypto functions
 │   └── supabase/
 │       ├── client.ts # Supabase browser client
 │       ├── middleware.ts # Session refresh logic
 │       └── server.ts # Supabase server client
+├── providers/
+│   └── ModalProvider.tsx # Provider for modal components including password prompt
 ├── services/
 │   ├── database.ts # All database queries
 │   └── keyManagement/ # Key Management Service
 │       ├── index.ts # Exports
 │       ├── interfaces.ts # Provider interfaces
 │       ├── KeyManagementService.ts # Main service
+│       ├── sessionKeyManager.ts # Session storage for keys
+│       ├── promptUtils.ts # Utilities for password prompting
 │       ├── useKeyManagement.ts # React hook
 │       └── providers/ # Implementation providers
 ├── store/
@@ -206,21 +238,27 @@ src/
 
 ### Key Functions:
 
-- `initializeAuth`: Checks for an existing session on app load and sets up a Supabase listener (`onAuthStateChange`) that automatically updates user/session state and crucially clears the `decryptedSymmetricKey` from memory on logout.
+- `initializeAuth`: Checks for an existing session on app load and sets up a Supabase listener (`onAuthStateChange`) that automatically updates user/session state and crucially clears the `decryptedSymmetricKey` from memory on logout. Also checks session storage for persisted symmetric keys.
 
 - `signup`: Handles Supabase user registration. Client-side: generates salt, main symmetric key, recovery key string. Derives password & recovery wrapping keys. Encrypts the symmetric key twice (once with password key, once with recovery key). Returns encrypted data, salt, the plaintext recovery key string (for the user to save), and the raw generated symmetric `CryptoKey` object.
 
-- `storeGeneratedKeys`: Takes the encrypted keys/salt/IVs **and the raw symmetric `CryptoKey`** from signup (after user confirmation). Saves the encrypted data to the `user_keys` table in Supabase. Crucially, it also immediately sets the provided raw symmetric `CryptoKey` into the `decryptedSymmetricKey` state in memory. Initializes the Key Management Service with the newly generated DCPE keys.
+- `storeGeneratedKeys`: Takes the encrypted keys/salt/IVs **and the raw symmetric `CryptoKey`** from signup (after user confirmation). Saves the encrypted data to the `user_keys` table in Supabase. Crucially, it also immediately sets the provided raw symmetric `CryptoKey` into the `decryptedSymmetricKey` state in memory and saves it to session storage. Initializes the Key Management Service with the newly generated DCPE keys.
 
-- `login`: Handles Supabase password authentication. Fetches the user's salt, password-encrypted key, and IV from the database. Client-side: re-derives the password wrapping key, decrypts the symmetric key, and stores the resulting `CryptoKey` in the `decryptedSymmetricKey` state (memory). Initializes the Key Management Service which then loads the user's encrypted DCPE keys from the database or localStorage.
+- `login`: Handles Supabase password authentication. Fetches the user's salt, password-encrypted key, and IV from the database. Client-side: re-derives the password wrapping key, decrypts the symmetric key, and stores the resulting `CryptoKey` in the `decryptedSymmetricKey` state (memory) and session storage. Initializes the Key Management Service which then loads the user's encrypted DCPE keys from the database or localStorage.
 
-- `logout`: Calls Supabase sign out. Relies on the `onAuthStateChange` listener to clear the user, session, and `decryptedSymmetricKey` state. The Key Management Service is also cleared.
+- `logout`: Calls Supabase sign out. Clears the session key from session storage. Relies on the `onAuthStateChange` listener to clear the user, session, and `decryptedSymmetricKey` state. The Key Management Service is also cleared.
 
-- `recoverWithKey`: (Assumes necessary encrypted data/salt is pre-fetched securely). Client-side: Takes the user-entered recovery key string and the fetched data, derives the recovery wrapping key, decrypts the symmetric key, and stores it in memory (`decryptedSymmetricKey`), enabling a password reset. Initializes the Key Management Service with the recovered key.
+- `checkSessionStorage`: Checks session storage for a saved symmetric key and initializes the Key Management Service if found.
 
-- `resetPasswordAndUpdateKeys`: (Requires `decryptedSymmetricKey` in memory). Updates the password in Supabase Auth. Client-side: Fetches the existing salt, derives a new wrapping key from the new password + existing salt, re-encrypts the symmetric key (from memory) using this new key. Updates only the password-related encrypted key (`enc_key_pw`) and IV (`iv_pw`) in the database, leaving the salt and recovery key data unchanged. Optionally updates the in-memory key for consistency.
+- `recoverKeyFromSession`: Attempts to recover the symmetric key from session storage when opening a new tab.
 
-- Security: Ensures Supabase (or any server-side actor) cannot access the user's decrypted symmetric key, as the decryption password/recovery key is never sent to the server, and decryption happens only in the browser. The key is available in memory immediately after signup completion or successful login/recovery.
+- `recoverWithPassword`: Prompts the user for their password to decrypt the symmetric key when it's not found in memory or session storage.
+
+- `recoverWithKey`: (Assumes necessary encrypted data/salt is pre-fetched securely). Client-side: Takes the user-entered recovery key string and the fetched data, derives the recovery wrapping key, decrypts the symmetric key, and stores it in memory (`decryptedSymmetricKey`) and session storage, enabling a password reset. Initializes the Key Management Service with the recovered key.
+
+- `resetPasswordAndUpdateKeys`: (Requires `decryptedSymmetricKey` in memory). Updates the password in Supabase Auth. Client-side: Fetches the existing salt, derives a new wrapping key from the new password + existing salt, re-encrypts the symmetric key (from memory) using this new key. Updates only the password-related encrypted key (`enc_key_pw`) and IV (`iv_pw`) in the database, leaving the salt and recovery key data unchanged. Optionally updates the in-memory key for consistency. Updates the key in session storage.
+
+- Security: Ensures Supabase (or any server-side actor) cannot access the user's decrypted symmetric key, as the decryption password/recovery key is never sent to the server, and decryption happens only in the browser. The key is available in memory immediately after signup completion or successful login/recovery, and persisted securely in session storage.
 
 # File Breakdown: src/services/keyManagement/KeyManagementService.ts
 
@@ -243,6 +281,22 @@ src/
 - `encrypt/decrypt methods`: Provides public methods (`encryptText`, `encryptMetadata`, `encryptVector`, etc.) that use the DCPE provider for actual encryption operations.
 
 - Security: Ensures all keys are properly encrypted before storage and only decrypted in memory when needed. Implements proper cleanup on logout.
+
+# File Breakdown: src/services/keyManagement/sessionKeyManager.ts
+
+- Purpose: Manages the persistence of symmetric keys across page refreshes using session storage.
+
+- Core Principle: Securely stores and retrieves the symmetric key in session storage, maintaining security while providing a better user experience.
+
+### Key Functions:
+
+- `storeSymmetricKeyInSession(symmetricKey: CryptoKey)`: Exports the CryptoKey to raw format, converts it to base64, and stores it in session storage.
+
+- `getSymmetricKeyFromSession()`: Retrieves the base64 key data from session storage, converts it back to a raw key, and imports it as a CryptoKey object.
+
+- `clearSessionKey()`: Removes the symmetric key from session storage during logout.
+
+- Security: Maintains the security of the symmetric key by only storing it within the current browser session. The key is cleared when the browser is closed.
 
 # File Breakdown: src/services/database.ts: Database Service
 
@@ -322,6 +376,15 @@ This section provides a concise overview of the key frontend components involved
     -   Provides a button to copy the recovery key to the clipboard.
     -   Includes a checkbox for the user to confirm that they have saved the recovery key.
     -   Uses a modal for display.
+
+## `src/components/auth/PasswordPromptModal.tsx`: Password Prompt Modal Component
+
+-   Purpose: Prompts the user to enter their password when the symmetric key is not available.
+-   Key Features:
+    -   Displays a modal with a form to enter the password.
+    -   Calls `recoverWithPassword` from `authStore.ts` to decrypt the symmetric key.
+    -   Handles loading and error states.
+    -   Shows helpful instructions to the user.
 
 ## `src/components/auth/PasswordRequirements.tsx`: Password Requirements Component
 

@@ -32,7 +32,7 @@ export default function DocumentUploader({
     reset 
   } = useDocumentProcessor();
 
-  const handleFileSelect = (selectedFile: File) => {
+  const handleFileSelect = async (selectedFile: File) => {
     setFile(selectedFile);
     reset();
   };
@@ -63,7 +63,7 @@ export default function DocumentUploader({
         // Decrypt the document name
         const document: Document = {
           ...documentData,
-          name: encryptionService.decryptMetadata(documentData.name)
+          name: await encryptionService.decryptMetadata(documentData.name)
         };
         
         // Call the completion handler
