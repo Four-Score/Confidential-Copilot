@@ -17,10 +17,6 @@ export const config = {
     length: 'standard' as const,
     includeAttachmentReferences: true,
   },
-
-  env: {
-    GROQ_API_KEY: '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',
-  },
 };
 
 export default config;
