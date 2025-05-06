@@ -1,5 +1,5 @@
 // src/services/LLMService.ts
-import { config } from '../config';
+import { GROQ_API_KEY } from '../secret';
 
 export interface GenerateOptions {
     tone: string;
@@ -34,7 +34,7 @@ export interface GenerateOptions {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.env.GROQ_API_KEY}`, // ✅ Fixed
+          'Authorization': `Bearer ${GROQ_API_KEY}`, // ✅ Fixed
         },        
         body: JSON.stringify({
           model: "llama3-70b-8192",

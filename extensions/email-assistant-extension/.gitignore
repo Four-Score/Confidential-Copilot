@@ -16,7 +16,7 @@ yarn-error.log*
 # OS generated files
 .DS_Store
 Thumbs.db
-.config.ts
+src/secrets.ts
 
 
 # Environment variables (if you use .env for API keys)
