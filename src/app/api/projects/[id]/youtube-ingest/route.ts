@@ -51,7 +51,7 @@ export async function POST(
       .insert([{
         project_id: projectId,
         name: title || `YouTube Video ${videoId}`,
-        type: 'video',
+        type: 'youtube',
         file_size: transcript.length,
         content: transcript,
         metadata: {
@@ -72,20 +72,23 @@ export async function POST(
     const formattedChunks = chunks.map((chunk: any, idx: number) => ({
       document_id: document.id,
       chunk_number: idx + 1,
-      content: chunk.content,
-      embedding: chunk.embedding,
+      chunk_content: chunk.content, // <-- FIXED: use chunk_content
+      encrypted_embeddings: chunk.encrypted_embeddings,
       metadata: chunk.metadata || {},
     }));
+
+    console.log('First chunk:', formattedChunks[0]);
 
     const { error: chunkError } = await supabase
       .from('v2_vector_chunks')
       .insert(formattedChunks);
 
     if (chunkError) {
+      console.error('Chunk insert error:', chunkError, formattedChunks);
       return NextResponse.json({ error: chunkError.message || 'Failed to save chunks' }, { status: 500 });
     }
 
-    return NextResponse.json({ documentId: document.id, success: true });
+    return NextResponse.json({ youtubeId: document.id, success: true });
   } catch (error: any) {
     console.error('Error in YouTube ingest route:', error);
     return NextResponse.json(

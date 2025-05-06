@@ -3,7 +3,7 @@ export interface Document {
   id: string;
   project_id: string;
   name: string;
-  type: 'pdf' | 'link' | 'video' | 'website'; // Add 'website' type
+  type: 'pdf' | 'link' | 'youtube' | 'website'; // Add 'website' type
   upload_date: string;
   file_size: number;
   page_count?: number;
@@ -16,7 +16,7 @@ export interface UnencryptedDocument {
   id: string;
   project_id: string;
   name: string;
-  type: 'website'; // Currently only website type uses unencrypted storage
+  type: 'website'| 'youtube'; // Currently only website type uses unencrypted storage
   upload_date: string;
   file_size: number;
   content?: string; // Unencrypted content
@@ -39,7 +39,7 @@ export type DocumentType = 'encrypted' | 'unencrypted';
 // Type guard to check if a document is unencrypted
 export function isUnencryptedDocument(doc: Document | UnencryptedDocument): doc is UnencryptedDocument {
   // Check if it's a website type or if it has unencrypted content
-  return doc.type === 'website' || 
+  return doc.type === 'website' || doc.type === 'youtube' ||
          ('content' in doc && !('encrypted_content' in doc));
 }
 
@@ -58,4 +58,21 @@ export interface WebsiteChunkMetadata {
   chunkIndex: number;
   startPosition: number;
   endPosition: number;
+}
+
+// Type for YouTube chunk (optional, if you want to distinguish)
+export interface YoutubeChunk {
+  id: string;
+  document_id: string;
+  chunk_number: number;
+  chunk_content: string;
+  metadata: YoutubeChunkMetadata;
+}
+
+export interface YoutubeChunkMetadata {
+  videoId: string;
+  chunkIndex: number;
+  startPosition: number;
+  endPosition: number;
+  [key: string]: any;
 }

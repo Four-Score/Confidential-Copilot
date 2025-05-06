@@ -81,6 +81,16 @@ export interface YoutubeProcessingOptions {
   onProgress?: (event: ProcessingProgressEvent) => void;
 }
 
+export interface YoutubeProcessingResult {
+  youtubeId: string;
+  success: boolean;
+  error?: string;
+  metadata?: {
+    chunkCount: number;
+    processingTimeMs: number;
+  };
+}
+
 /**
  * Process document using client-side processing
  * This function orchestrates the entire processing pipeline:
@@ -562,13 +572,12 @@ export async function processYoutubeTranscript(
   videoId: string,
   videoUrl: string,
   title?: string,
-  options?: YoutubeProcessingOptions // add options for progress/cancel
-) {
+  options?: YoutubeProcessingOptions
+): Promise<YoutubeProcessingResult> {
   const jobId = uuidv4();
   const onProgress = options?.onProgress || (() => {});
   const signal = options?.signal;
 
-  // Helper for reporting progress
   const reportProgress = (
     status: ProcessingStatus,
     progress: number,
@@ -584,6 +593,102 @@ export async function processYoutubeTranscript(
     return updateProcessingProgress(jobId, progress, status, currentStep, 'youtube');
   };
 
-  await reportProgress('initialized', 0, 'Starting YouTube ingestion');
-  // ...stepwise: validating, extracting, chunking, embedding, uploading, completed
+  try {
+    await reportProgress('initialized', 0, 'Starting YouTube ingestion');
+
+    // Step 1: Chunk transcript (simple split, you can improve this)
+    await reportProgress('chunking', 10, 'Chunking transcript...');
+    const chunkSize = 2000;
+    const overlap = 200;
+    const chunks: { chunkNumber: number; content: string }[] = [];
+    let start = 0, chunkNumber = 1;
+    while (start < transcript.length) {
+      const end = Math.min(start + chunkSize, transcript.length);
+      chunks.push({
+        chunkNumber,
+        content: transcript.slice(start, end)
+      });
+      start += chunkSize - overlap;
+      chunkNumber++;
+    }
+    await reportProgress('chunking', 20, `Created ${chunks.length} transcript chunks`);
+
+    // Step 2: Generate embeddings and encrypt (SEQUENTIALLY)
+    await reportProgress('embedding', 30, 'Generating embeddings...');
+    const chunksWithEmbeddings = [];
+    for (let idx = 0; idx < chunks.length; idx++) {
+      const chunk = chunks[idx];
+      try {
+        const embedding = await generateEmbedding(chunk.content);
+        const encryptedEmbedding = await encryptVector(embedding);
+        await reportProgress(
+          'embedding',
+          30 + ((idx + 1) / chunks.length) * 40,
+          `Embedding chunk ${idx + 1}/${chunks.length}`
+        );
+        chunksWithEmbeddings.push({
+          ...chunk,
+          encrypted_embeddings: encryptedEmbedding,
+          metadata: {
+            videoId,
+            chunkIndex: chunk.chunkNumber,
+            startPosition: (chunk.chunkNumber - 1) * (chunkSize - overlap),
+            endPosition: (chunk.chunkNumber - 1) * (chunkSize - overlap) + chunk.content.length
+          }
+        });
+      } catch (err) {
+        // Optionally log or handle the error for this chunk
+        console.error(`Embedding failed for chunk ${idx + 1}:`, err);
+      }
+    }
+
+    // Step 3: Store in DB via API
+    await reportProgress('storing', 80, 'Storing YouTube transcript...');
+    const response = await fetch(`/api/projects/${projectId}/youtube-ingest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        videoId,
+        transcript,
+        title,
+        url: videoUrl,
+        chunks: chunksWithEmbeddings,
+        metadata: {
+          videoId,
+          url: videoUrl,
+          title
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      await reportProgress('error', 0, error.error || 'Failed to store YouTube transcript');
+      return {
+        youtubeId: '',
+        success: false,
+        error: error.error || 'Failed to store YouTube transcript'
+      };
+    }
+
+    const data = await response.json();
+    await reportProgress('completed', 100, 'YouTube transcript processed');
+
+    return {
+      youtubeId: data.id || videoId,
+      success: true,
+      metadata: {
+        chunkCount: chunksWithEmbeddings.length,
+        processingTimeMs: 0 // You can add timing if needed
+      }
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    await reportProgress('error', 0, errorMessage);
+    return {
+      youtubeId: '',
+      success: false,
+      error: errorMessage
+    };
+  }
 }

@@ -13,6 +13,7 @@ import { Document, UnencryptedDocument } from '@/types/document';
 import { useKeyManagement } from '@/services/keyManagement';
 import { useDocumentProcessor } from '@/hooks/useDocumentProcessor';
 import YoutubePreview from '@/components/youtube/YoutubePreview';
+import { processYoutubeTranscript } from '@/lib/clientProcessing';
 
 export default function ProjectPage() {
   const params = useParams();
@@ -205,23 +206,15 @@ export default function ProjectPage() {
   const handleYoutubeIngest = async () => {
     if (!youtubeVideoId || !youtubeTranscript) return;
     try {
-      const response = await fetch(`/api/projects/${projectId}/youtube-ingest`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId,
-          videoId: youtubeVideoId,
-          transcript: youtubeTranscript,
-          metadata: {
-            title: 'Video Title',
-            url: `https://www.youtube.com/watch?v=${youtubeVideoId}`,
-          },
-          chunks: [], // Processed transcript chunks, if required
-        }),
-      });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to ingest YouTube data');
+      const result = await processYoutubeTranscript(
+        projectId,
+        youtubeTranscript,
+        youtubeVideoId,
+        `https://www.youtube.com/watch?v=${youtubeVideoId}`,
+        'Video Title'
+      );
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to ingest YouTube data');
       }
       // Optionally refresh documents or show a success message
       setYoutubeTranscript(null);
