@@ -165,3 +165,15 @@ await processYoutubeTranscript(
 ## Last Updated
 
 May 2025
+
+# YouTube Card UI:
+The YouTube document card UI has been updated to match the style and layout of website and document cards for a consistent user experience. This includes unified card structure, consistent date/size/type display, and improved delete confirmation dialog.
+
+# Delete Functionality:
+Deleting a YouTube document now uses a dedicated API route:
+DELETE /api/projects/[id]/youtube/[youtubeId]
+This ensures YouTube docs are removed from the v2_documents table without affecting other document types.
+
+
+# Card Rendering Logic:
+The frontend now renders YouTube, website, and document cards using type checks, ensuring the correct card and delete handler are used for each document type.

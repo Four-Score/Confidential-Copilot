@@ -35,7 +35,8 @@ export default function ProjectPage() {
   const [showYoutubeInput, setShowYoutubeInput] = useState(false);
   const [youtubeTranscript, setYoutubeTranscript] = useState<string | null>(null);
   const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
-
+  const [isYoutubeIngesting, setIsYoutubeIngesting] = useState(false);
+  const [youtubeDocs, setYoutubeDocs] = useState<UnencryptedDocument[]>([]);
   // Get encryption service
   const { service: encryptionService, isLoading: isEncryptionLoading } = useKeyManagement();
   
@@ -100,6 +101,18 @@ export default function ProjectPage() {
         } catch (websiteError) {
           console.error('Error fetching websites:', websiteError);
           // Non-critical error, we can still continue
+        }
+
+        // Fetch YouTube docs for this project
+        try {
+          const youtubeResponse = await fetch(`/api/projects/${projectId}/youtube`);
+          if (youtubeResponse.ok) {
+            const youtubeData = await youtubeResponse.json();
+            setYoutubeDocs(Array.isArray(youtubeData.youtube) ? youtubeData.youtube : []);
+          }
+        } catch (youtubeError) {
+          console.error('Error fetching YouTube docs:', youtubeError);
+          // Non-critical error, continue
         }
       } catch (err) {
         console.error('Error fetching project data:', err);
@@ -205,6 +218,7 @@ export default function ProjectPage() {
 
   const handleYoutubeIngest = async () => {
     if (!youtubeVideoId || !youtubeTranscript) return;
+    setIsYoutubeIngesting(true);
     try {
       const result = await processYoutubeTranscript(
         projectId,
@@ -224,6 +238,28 @@ export default function ProjectPage() {
       handleBackToProject();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to ingest YouTube data');
+    }finally {
+      setIsYoutubeIngesting(false);
+    }
+  };
+
+  const handleDeleteYoutube = async (youtubeId: string) => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/youtube/${youtubeId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete YouTube video');
+      }
+      setYoutubeDocs(prev => prev.filter(doc => doc.id !== youtubeId));
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting YouTube video:', err);
+      return { 
+        success: false, 
+        error: err instanceof Error ? err.message : 'An unknown error occurred'
+      };
     }
   };
 
@@ -456,6 +492,10 @@ export default function ProjectPage() {
             transcript={youtubeTranscript}
             onBack={handleBackToProject}
             onConfirm={handleYoutubeIngest}
+            isProcessing={isYoutubeIngesting || isProcessing}
+            progress={progress}
+            status={status}
+            error={processingError}
           />
         </div>
       </div>
@@ -505,7 +545,7 @@ export default function ProjectPage() {
   }
 
   // Combine documents and websites for display
-  const allDocuments = [...documents, ...websites];
+  const allDocuments = [...documents, ...websites,...youtubeDocs];
   
   // Normal project page view with data ingestion buttons and document list
   return (
@@ -523,6 +563,7 @@ export default function ProjectPage() {
           documents={allDocuments} 
           onDelete={handleDeleteDocument}
           onWebsiteDelete={handleDeleteWebsite} 
+          onYoutubeDelete={handleDeleteYoutube}
         />
       ) : (
         <div className="bg-gray-50 rounded-lg p-6 text-center">

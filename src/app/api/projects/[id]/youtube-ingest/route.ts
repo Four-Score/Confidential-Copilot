@@ -77,7 +77,7 @@ export async function POST(
       metadata: chunk.metadata || {},
     }));
 
-    console.log('First chunk:', formattedChunks[0]);
+    // console.log('First chunk:', formattedChunks[0]);
 
     const { error: chunkError } = await supabase
       .from('v2_vector_chunks')
