@@ -19,6 +19,12 @@ import { KeyMaterial,
         EncryptedKeyData,
         RecoveryKeyData
 } from '@/types/auth';
+import { 
+    storeSymmetricKeyInSession, 
+    getSymmetricKeyFromSession,
+    clearSessionKey 
+} from '@/services/keyManagement/sessionKeyManager';
+
 
 // Helper function to validate email format
 const isValidEmail = (email: string): boolean => {
@@ -51,7 +57,7 @@ interface AuthState {
     isLoading: boolean; // Indicates if an async operation is in progress
     error: string | null; // Stores any error message
     isAuthenticated: () => boolean; // Derived state helper - checks if user and session exist
-
+    
     // --- Core Actions ---
     // (Implementation details will be added later for complex ones)
     login: (email: string, password: string) => Promise<{ success: boolean; error?: string; recoveryKeyNeeded?: boolean }>;
@@ -85,6 +91,9 @@ interface AuthState {
     setError: (error: string | null) => void;
     clearError: () => void;
     initializeAuth: () => Promise<void>; // Check initial auth state
+    checkSessionStorage: () => Promise<boolean>;
+    recoverKeyFromSession: () => Promise<boolean>;
+    recoverWithPassword: (password: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 
@@ -182,51 +191,87 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const supabase = createClient(); // Browser client
 
         try {
-            // First check if we have a user from the direct authentication request
-            const { data: { user }, error } = await supabase.auth.getUser();
-
-            // If there's an error related to missing session/refresh token, this is normal for new visitors
-            // So we'll handle it quietly without showing errors to the user
-            if (error) {
-                if (error.message?.includes("Auth session missing") || 
-                   error.message?.includes("Refresh Token Not Found") ||
-                   error.name === "AuthSessionMissingError") {
-                    // This is an expected case for users who haven't logged in yet
+            // Get existing session
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            
+            if (sessionError) {
+                if (sessionError.message?.includes("Auth session missing") || 
+                   sessionError.message?.includes("Refresh Token Not Found") ||
+                   sessionError.name === "AuthSessionMissingError") {
                     console.log("No active session found - user not logged in");
                     set({ user: null, session: null, isLoading: false, error: null });
                     return;
                 }
                 
-                // For other types of errors, we'll log them as before
-                console.error("Error fetching auth user:", error);
+                console.error("Error fetching auth session:", sessionError);
                 set({ user: null, session: null, isLoading: false, error: "Failed to initialize session." });
                 return;
             }
 
-            if (user) {
-                set({ user, session: null, isLoading: false });
-                console.log("User found:", user);
+            if (session) {
+                // Set user and session from existing session
+                set({ 
+                    user: session.user,
+                    session: session
+                });
 
-                // Get user security key if it exists
-                const { data: userKeyData, error: userKeyError } = await supabase
-                    .from('user_keys')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .maybeSingle();
-
-                if (userKeyError) {
-                    console.error("Error fetching user key:", userKeyError);
-                } else if (userKeyData) {
-                    console.log("User key data found:", userKeyData);
-                } else {
-                    console.log("No user key data found.");
+                try {
+                    // Check session storage for symmetric key
+                    console.log("Checking session storage for symmetric key");
+                    const sessionKey = await getSymmetricKeyFromSession();
+                    if (sessionKey) {
+                        console.log('Found symmetric key in session storage');
+                        set({ decryptedSymmetricKey: sessionKey });
+                        
+                        // Initialize key management service with session key
+                        try {
+                            await keyManagementService.initialize(session.user.id, sessionKey);
+                            console.log("Key management service initialized from session storage");
+                        } catch (initError) {
+                            console.error("Failed to initialize key management service from session:", initError);
+                        }
+                    } else {
+                        console.log("No symmetric key found in session storage");
+                        // Continue without key - user will need to log in again
+                    }
+                } catch (sessionStorageError) {
+                    console.error("Failed to check session storage:", sessionStorageError);
+                }
+                
+                try {
+                    // Attempt to load the user's encryption keys if session exists
+                    const userId = session.user.id;
+                    const keyData = await userDbService.fetchUserKeys(userId);
+                    
+                    if (keyData) {
+                        console.log('Found existing user keys, session restored');
+                        // Note: For security, we're not automatically loading the symmetric key
+                        // The user will need to log in again to decrypt the key
+                    } else {
+                        console.log("No user key data found.");
+                    }
+                } catch (error) {
+                    console.error('Error loading keys for existing session:', error);
+                    // Continue with authenticated session but without keys loaded
                 }
             } else {
-                set({ user: null, session: null, isLoading: false });
-                console.log("No user found.");
+                set({ user: null, session: null });
+                console.log("No active session found.");
             }
+            
+            // Set up the auth state change listener
+            const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
+                console.log("Auth state changed:", event);
+                if (currentSession) {
+                    set({ user: currentSession.user, session: currentSession });
+                } else {
+                    // Clear auth state and decrypted key when session is lost
+                    set({ user: null, session: null, decryptedSymmetricKey: null });
+                }
+            });
+            
+            set({ isLoading: false });
         } catch (error: any) {
-            // Check if this is a session-missing error, which is normal for new visitors
             if (error.message?.includes("Auth session missing") || 
                 error.name === "AuthSessionMissingError") {
                 console.log("No active session found - user not logged in");
@@ -235,11 +280,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             }
             
             console.error("Error initializing auth:", error);
-            set({ user: null, session: null, isLoading: false, error: "Failed to initialize session." });
+            set({ 
+                user: null, 
+                session: null, 
+                isLoading: false, 
+                error: error instanceof Error ? error.message : "Failed to initialize session." 
+            });
         }
     },
-
-   
     //  Logs in an existing user.
     //  @param email - The user's email address.
     //  @param password - The user's password.
@@ -316,6 +364,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             // 7. Store the decrypted key in state
             set({ decryptedSymmetricKey: symmetricKey, isLoading: false, error: null });
             console.log("Decrypted key stored in memory.");
+
+            // Store the symmetric key in session storage
+            try {
+                await storeSymmetricKeyInSession(symmetricKey);
+                console.log("Symmetric key saved to session storage");
+            } catch (sessionError) {
+                console.error("Failed to save key to session storage:", sessionError);
+                // Non-fatal error, continue with login
+            }
 
             // 8. Initialize the new key management service
             try {
@@ -492,10 +549,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 }
 
                 console.log("Keys stored successfully in database.");
-                // --- NEW: Set the decrypted key in state ---
+                
                 set({ decryptedSymmetricKey: generatedKey, isLoading: false, error: null });
                 console.log("Decrypted key set in memory after signup.");
-                // --- End NEW ---
+                // Store the symmetric key in session storage
+                try {
+                    await storeSymmetricKeyInSession(generatedKey);
+                    console.log("Symmetric key saved to session storage after signup");
+                } catch (sessionError) {
+                    console.error("Failed to save key to session storage:", sessionError);
+                    // Non-fatal error, continue with signup
+                }
+
+              
 
                 // Initialize the key management service with new keys immediately
                 try {
@@ -535,6 +601,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         console.log("Logging out...");
         set({ isLoading: true, error: null });
         const supabase = createClient();
+        
+        // Clear the session key
+        try {
+            await clearSessionKey();
+            console.log("Cleared symmetric key from session storage");
+        } catch (error) {
+            console.error("Error clearing session key:", error);
+            // Non-fatal error, continue with logout
+        }
+        
         const { error } = await supabase.auth.signOut();
         if (error) {
             console.error("Error logging out:", error);
@@ -600,6 +676,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             // 5. Store the decrypted key in state
             set({ decryptedSymmetricKey: symmetricKey, isLoading: false, error: null });
             console.log("Decrypted key stored in memory for password reset.");
+            
+            // Store the symmetric key in session storage
+            try {
+                await storeSymmetricKeyInSession(symmetricKey);
+                console.log("Symmetric key saved to session storage after recovery");
+            } catch (sessionError) {
+                console.error("Failed to save key to session storage after recovery:", sessionError);
+                // Non-fatal error, continue with recovery
+            }
 
             // 6. Initialize the new key management service if user is available
             const currentUser = get().user;
@@ -704,7 +789,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
              const finalSymmetricKey = await importSymmetricKey(reDecryptedRaw);
              set({ decryptedSymmetricKey: finalSymmetricKey });
              console.log("Key updated in memory to match new password derivation.");
-
+            
+            // Update the key in session storage
+            try {
+                await storeSymmetricKeyInSession(finalSymmetricKey);
+                console.log("Updated symmetric key saved to session storage after password reset");
+            } catch (sessionError) {
+                console.error("Failed to update key in session storage:", sessionError);
+                // Non-fatal error, continue with password reset
+            }
 
             set({ isLoading: false, error: null });
             console.log("Password reset and key update process completed successfully.");
@@ -714,6 +807,144 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             return handleAuthError(set, supabase, error, "An unknown error occurred during password reset.");
         }
     },
+
+    /**
+     * Checks session storage for a saved symmetric key
+     * @returns Promise<boolean> indicating if a key was successfully retrieved
+     */
+    checkSessionStorage: async (): Promise<boolean> => {
+        try {
+            console.log("Checking session storage for saved symmetric key");
+            const symmetricKey = await getSymmetricKeyFromSession();
+            
+            if (symmetricKey) {
+                console.log("Found symmetric key in session storage");
+                set({ decryptedSymmetricKey: symmetricKey });
+                
+                // Initialize key management service with the session key
+                const user = get().user;
+                if (user) {
+                    try {
+                        await keyManagementService.initialize(user.id, symmetricKey);
+                        console.log("Key management service initialized with session key");
+                        return true;
+                    } catch (error) {
+                        console.error("Failed to initialize key management with session key:", error);
+                    }
+                }
+            } else {
+                console.log("No symmetric key found in session storage");
+            }
+            return false;
+        } catch (error) {
+            console.error("Error retrieving key from session storage:", error);
+            return false;
+        }
+    },
+
+    recoverKeyFromSession: async (): Promise<boolean> => {
+        const user = get().user;
+        const supabase = createClient();
+        
+        if (!user) return false;
+        
+        try {
+        set({ isLoading: true });
+        
+        // First try session storage
+        const sessionKey = await getSymmetricKeyFromSession();
+        if (sessionKey) {
+            set({ decryptedSymmetricKey: sessionKey });
+            await keyManagementService.initialize(user.id, sessionKey);
+            set({ isLoading: false });
+            return true;
+        }
+        
+        // If that fails, try to recover using database key data
+        // Note: This will require the Supabase JWT token to have the correct permissions
+        
+        // 1. Get the user's key material
+        console.log("Attempting to recover key from database in new tab...");
+        const keyData = await userDbService.fetchUserKeys(user.id);
+        
+        if (!keyData || !keyData.enc_key_pw || !keyData.iv_pw || !keyData.salt) {
+            console.log("Could not find key data in database");
+            set({ isLoading: false });
+            return false;
+        }
+        
+        // 2. Request the user to re-enter their password
+        // This would require a UI prompt - for now we'll just return false
+        console.log("Would need password to recover key - returning false for now");
+        set({ isLoading: false });
+        return false;
+        
+        // In a complete implementation, you would:
+        // - Show a password prompt modal
+        // - Use the password to decrypt the key
+        // - Store in sessionStorage
+        // - Initialize the key management service
+        } catch (error) {
+        console.error("Error in recoverKeyFromSession:", error);
+        set({ isLoading: false, error: "Failed to recover key from session" });
+        return false;
+        }
+    },
+    recoverWithPassword: async (password: string): Promise<{ success: boolean; error?: string }> => {
+        const user = get().user;
+        
+        if (!user) {
+          return { success: false, error: "Not authenticated" };
+        }
+        
+        try {
+          set({ isLoading: true, error: null });
+          
+          // 1. Fetch the user's key material
+          const keyData = await userDbService.fetchUserKeys(user.id);
+          
+          if (!keyData || !keyData.enc_key_pw || !keyData.iv_pw || !keyData.salt) {
+            set({ isLoading: false, error: "Key data not found" });
+            return { success: false, error: "Encryption keys not found in database" };
+          }
+          
+          // 2. Decode data
+          const salt = base64ToArrayBuffer(keyData.salt);
+          const encryptedKeyData = base64ToArrayBuffer(keyData.enc_key_pw);
+          const iv = new Uint8Array(base64ToArrayBuffer(keyData.iv_pw));
+          
+          // 3. Derive wrapping key from password
+          console.log("Deriving key from password...");
+          const wrappingKey = await deriveKeyFromPassword(password, new Uint8Array(salt));
+          
+          // 4. Decrypt the symmetric key
+          console.log("Decrypting symmetric key...");
+          try {
+            const decryptedRawKey = await decryptKey(encryptedKeyData, iv, wrappingKey);
+            const symmetricKey = await importSymmetricKey(decryptedRawKey);
+            
+            // 5. Store in state and session storage
+            set({ decryptedSymmetricKey: symmetricKey });
+            await storeSymmetricKeyInSession(symmetricKey);
+            console.log("Key recovered successfully and stored in session");
+            
+            // 6. Initialize key management service
+            await keyManagementService.initialize(user.id, symmetricKey);
+            console.log("Key management service initialized from password recovery");
+            
+            set({ isLoading: false });
+            return { success: true };
+          } catch (decryptError) {
+            console.error("Failed to decrypt key:", decryptError);
+            set({ isLoading: false, error: "Invalid password" });
+            return { success: false, error: "Invalid password" };
+          }
+        } catch (error) {
+          console.error("Error recovering with password:", error);
+          set({ isLoading: false, error: "Failed to recover key" });
+          return { success: false, error: "An error occurred while recovering your key" };
+        }
+      },
 
 }));
 

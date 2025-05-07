@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { keyManagementService } from '@/services/keyManagement';
+import { useModalContext } from '@/contexts/PasswordModalContext';
 import { useDataSelection } from '@/contexts/DataSelectionContext';
+
 
 // Define type for document source
 type DocumentSource = 'encrypted' | 'unencrypted';
@@ -29,6 +31,7 @@ export const SelectableDocumentCard: React.FC<SelectableDocumentCardProps> = ({
   source,
   onSelect
 }) => {
+  const { showPasswordPrompt } = useModalContext();
   const { isDocumentSelected, toggleDocument } = useDataSelection();
   const [displayName, setDisplayName] = useState<string>(document.name);
   const [isSelected, setIsSelected] = useState<boolean>(isDocumentSelected(document.id));
@@ -110,10 +113,9 @@ export const SelectableDocumentCard: React.FC<SelectableDocumentCardProps> = ({
     const decryptDocumentName = async () => {
       if (source === 'encrypted' && document.encryptedName) {
         try {
-          // Use decryptMetadata instead of decryptText for document names
-          // Document names are encrypted using encryptMetadata, not encryptText
           if (!keyManagementService.isInitialized()) {
-            console.log("Key Management Service not initialized yet, skipping decryption");
+            console.log("Key Management Service not initialized yet, triggering password prompt");
+            showPasswordPrompt(); // Show password prompt when keys aren't available
             setDisplayName(document.name || 'Encrypted Document');
             return;
           }
@@ -126,9 +128,9 @@ export const SelectableDocumentCard: React.FC<SelectableDocumentCardProps> = ({
         }
       }
     };
-
+  
     decryptDocumentName();
-  }, [document.name, document.encryptedName, source]);
+  }, [document.name, document.encryptedName, source, showPasswordPrompt]);
 
   // Effect to sync selection state with context
   useEffect(() => {

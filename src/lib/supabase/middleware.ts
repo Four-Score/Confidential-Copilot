@@ -29,6 +29,8 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
+  const { data: { session } } = await supabase.auth.getSession();
+  
   // Refresh session if expired - required for Server Components
   await supabase.auth.getUser();
 
