@@ -5,6 +5,10 @@ interface YoutubeCardProps {
   onDelete: (documentId: string) => void;
 }
 
+// Helper to extract videoId from URL or use metadata.videoId
+const getYoutubeThumbnail = (videoId: string) =>
+  `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+
 export default function YoutubeCard({ document, onDelete }: YoutubeCardProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -24,9 +28,8 @@ export default function YoutubeCard({ document, onDelete }: YoutubeCardProps) {
     else return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   }
 
-  const youtubeIcon = "/youtube.svg";
-  const videoTitle = document.name || document.metadata?.title || 'YouTube Video';
   const videoUrl = document.metadata?.url || '';
+  const videoId = document.metadata?.videoId;
 
   const handleDelete = async (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -45,23 +48,18 @@ export default function YoutubeCard({ document, onDelete }: YoutubeCardProps) {
     <div className="bg-white border border-gray-200 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
       <div className="p-5">
         <div className="flex justify-between items-start">
+          {/* Thumbnail and Date Row */}
           <div className="flex items-center">
-            <div className="h-12 w-12 flex items-center justify-center">
+            {videoId && (
               <img
-                src={youtubeIcon}
-                alt="YouTube"
-                className="max-h-10 max-w-10"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/globe.svg';
-                }}
+                src={getYoutubeThumbnail(videoId)}
+                alt="YouTube video preview"
+                style={{ width: 120, height: 90, borderRadius: 6, marginRight: 12 }}
               />
-            </div>
-            <div className="ml-4">
-              <h3 className="text-lg font-medium text-gray-900 mb-1 truncate max-w-xs">
-                {videoTitle}
-              </h3>
-              <p className="text-sm text-gray-500">Uploaded on {formattedDate}</p>
-            </div>
+            )}
+            <span className="text-sm text-gray-500 ml-2 whitespace-nowrap">
+              Uploaded on {formattedDate}
+            </span>
           </div>
           <div className="relative">
             <button
@@ -106,6 +104,7 @@ export default function YoutubeCard({ document, onDelete }: YoutubeCardProps) {
             )}
           </div>
         </div>
+        {/* Card Details */}
         <div className="grid grid-cols-2 gap-2 mt-4">
           <div className="bg-gray-50 p-3 rounded">
             <span className="text-xs text-gray-500 block">Type</span>

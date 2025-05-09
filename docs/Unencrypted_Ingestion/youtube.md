@@ -5,7 +5,7 @@
 This feature allows users to ingest YouTube video transcripts into the platform, chunk and embed the transcript client-side, and store both the document and its vectorized chunks in the database for semantic search and retrieval.
 
 ---
-
+6- May 2025
 ## Architecture
 
 **Client Side:**
@@ -161,11 +161,8 @@ await processYoutubeTranscript(
 ---
 
 ---
-
-## Last Updated
-
-May 2025
-
+7 May 2025
+# new updates
 # YouTube Card UI:
 The YouTube document card UI has been updated to match the style and layout of website and document cards for a consistent user experience. This includes unified card structure, consistent date/size/type display, and improved delete confirmation dialog.
 
