@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { ModalProvider as BaseModalProvider } from '@/contexts/ModalContext';
-import { DataSelectionProvider } from '@/providers/DataSelectionProvider'; // Update this import
+import { ModalProvider as PasswordModalProvider } from '@/contexts/PasswordModalContext';
+import { DataSelectionProvider } from '@/providers/DataSelectionProvider'; 
 import { ProjectSelectionModal } from '@/components/retrieval/ProjectSelectionModal';
 import { DataSelectionModal } from '@/components/retrieval/DataSelectionModal';
 import { SearchModal } from '@/components/retrieval/SearchModal';
@@ -14,14 +15,16 @@ interface ModalProviderProps {
 export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
   return (
     <BaseModalProvider>
-      <DataSelectionProvider>
-        {children}
-        
-        {/* Modals */}
-        <ProjectSelectionModal />
-        <DataSelectionModal />
-        <SearchModal />
-      </DataSelectionProvider>
+      <PasswordModalProvider>
+        <DataSelectionProvider>
+          {children}
+          
+          {/* Modals */}
+          <ProjectSelectionModal />
+          <DataSelectionModal />
+          <SearchModal />
+        </DataSelectionProvider>
+      </PasswordModalProvider>
     </BaseModalProvider>
   );
 };

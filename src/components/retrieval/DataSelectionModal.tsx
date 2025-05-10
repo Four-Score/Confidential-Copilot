@@ -35,6 +35,17 @@ interface WebsiteResponse {
   }>;
 }
 
+// Add YouTube document type
+interface YoutubeDocument {
+  id: string;
+  title: string;
+  type: string; // 'youtube'
+  upload_date?: string;
+  url?: string;
+  file_size?: number;
+  metadata?: any;
+}
+
 export const DataSelectionModal: React.FC = () => {
   // Hooks
   const { isModalOpen, closeModal, openModal, goBack, modalProps } = useModal();
@@ -52,11 +63,15 @@ export const DataSelectionModal: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [encryptedDocuments, setEncryptedDocuments] = useState<Document[]>([]);
   const [unencryptedDocuments, setUnencryptedDocuments] = useState<Document[]>([]);
+  const [youtubeDocuments, setYoutubeDocuments] = useState<YoutubeDocument[]>([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
       
   // Effect to fetch project data
   useEffect(() => {
-    if (!selectedProjectId) return;
+    // Only fetch when modal is actually open AND we have a project ID
+    const isOpen = isModalOpen && modalProps.currentView === MODAL_ROUTES.DATA_SELECTION;
+    
+    if (!selectedProjectId || !isOpen) return;
     
     const fetchProjectData = async () => {
       setIsLoading(true);
@@ -99,6 +114,25 @@ export const DataSelectionModal: React.FC = () => {
             encryptedName: false // Website names are not encrypted
           })));
         }
+
+        // Fetch YouTube documents
+        const youtubeResponse = await fetch(`/api/projects/${selectedProjectId}/youtube`);
+        if (!youtubeResponse.ok) {
+          const errorData = await youtubeResponse.json();
+          console.error('Error fetching YouTube documents:', errorData);
+        } else {
+          const ytData = await youtubeResponse.json();
+          // Use ytData.youtube (array) instead of ytData
+          setYoutubeDocuments(Array.isArray(ytData.youtube) ? ytData.youtube.map((doc: any) => ({
+            id: doc.id,
+            title: doc.title || doc.name || 'Untitled Video',
+            type: 'youtube',
+            upload_date: doc.upload_date,
+            url: doc.content, // content is the video URL in your schema
+            file_size: doc.file_size,
+            metadata: doc.metadata,
+          })) : []);
+        }
       } catch (err) {
         console.error('Error fetching project data:', err);
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
@@ -107,12 +141,17 @@ export const DataSelectionModal: React.FC = () => {
       }
     };
     
+    
     fetchProjectData();
-  }, [selectedProjectId]);
+  }, [selectedProjectId, isModalOpen, modalProps.currentView]);
 
   // Check if all documents are selected - more efficient check
   useEffect(() => {
-    if (encryptedDocuments.length === 0 && unencryptedDocuments.length === 0) {
+    if (
+      encryptedDocuments.length === 0 &&
+      unencryptedDocuments.length === 0 &&
+      youtubeDocuments.length === 0
+    ) {
       setIsAllSelected(false);
       return;
     }
@@ -120,7 +159,8 @@ export const DataSelectionModal: React.FC = () => {
     // Count all document IDs
     const allDocsIds = new Set([
       ...encryptedDocuments.map(doc => doc.id),
-      ...unencryptedDocuments.map(doc => doc.id)
+      ...unencryptedDocuments.map(doc => doc.id),
+      ...youtubeDocuments.map(doc => doc.id),
     ]);
     
     // Count selected document IDs that are in our current document sets
@@ -130,7 +170,7 @@ export const DataSelectionModal: React.FC = () => {
     
     // All selected if counts match
     setIsAllSelected(selectedDocsInCurrentProject.length === allDocsIds.size);
-  }, [encryptedDocuments, unencryptedDocuments, selectedDocuments]);
+  }, [encryptedDocuments, unencryptedDocuments, youtubeDocuments, selectedDocuments]);
 
   // Handle select all toggle
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -150,8 +190,15 @@ export const DataSelectionModal: React.FC = () => {
         name: doc.name,
         type: 'unencrypted' as const
       }));
+
+      const allYoutubeDocs = youtubeDocuments.map(doc => ({
+        id: doc.id,
+        name: doc.title,
+        type: 'unencrypted' as const, // treat as unencrypted
+        docType: 'youtube' as const,  // optional: for downstream logic
+      }));
       
-      selectAllDocuments([...allEncryptedDocs, ...allUnencryptedDocs]);
+      selectAllDocuments([...allEncryptedDocs, ...allUnencryptedDocs, ...allYoutubeDocs]);
     } else {
       clearDocumentSelection();
     }
@@ -208,7 +255,7 @@ export const DataSelectionModal: React.FC = () => {
               type="checkbox"
               checked={isAllSelected}
               onChange={handleSelectAll}
-              disabled={encryptedDocuments.length === 0 && unencryptedDocuments.length === 0}
+              disabled={encryptedDocuments.length === 0 && unencryptedDocuments.length === 0 && youtubeDocuments.length === 0}
               className="form-checkbox h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
             />
             <span className="ml-2 text-gray-700 font-medium">Select All Documents</span>
@@ -237,7 +284,7 @@ export const DataSelectionModal: React.FC = () => {
           )}
           
           {/* No documents state */}
-          {!isLoading && !error && encryptedDocuments.length === 0 && unencryptedDocuments.length === 0 && (
+          {!isLoading && !error && encryptedDocuments.length === 0 && unencryptedDocuments.length === 0 && youtubeDocuments.length === 0 && (
             <div className="text-center py-12 bg-gray-50 rounded-lg">
               <h3 className="text-lg font-medium text-gray-900">No documents found</h3>
               <p className="mt-2 text-gray-500">This project doesn't have any documents yet</p>
@@ -272,6 +319,32 @@ export const DataSelectionModal: React.FC = () => {
                       <SelectableDocumentCard 
                         key={doc.id}
                         document={doc}
+                        source="unencrypted"
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* YouTube Documents Section */}
+              {youtubeDocuments.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-gray-900 flex items-center">
+                    {/* <svg className="w-5 h-5 mr-2 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M21.8 8.001a2.75 2.75 0 0 0-1.94-1.94C18.13 6 12 6 12 6s-6.13 0-7.86.061A2.75 2.75 0 0 0 2.2 8.001C2 9.74 2 12 2 12s0 2.26.2 3.999a2.75 2.75 0 0 0 1.94 1.94C5.87 18 12 18 12 18s6.13 0 7.86-.061a2.75 2.75 0 0 0 1.94-1.94C22 14.26 22 12 22 12s0-2.26-.2-3.999zM10 15.5v-7l6 3.5-6 3.5z"/>
+                    </svg> */}
+                    YouTube Transcripts
+                  </h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    {youtubeDocuments.map(doc => (
+                      <SelectableDocumentCard
+                        key={doc.id}
+                        document={{
+                          ...doc,
+                          name: doc.title,
+                          type: 'youtube',
+                          encryptedName: false,
+                        }}
                         source="unencrypted"
                       />
                     ))}

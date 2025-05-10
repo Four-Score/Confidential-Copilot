@@ -22,6 +22,7 @@ The service follows a provider pattern that allows for different implementations
    - `DCPEWrapper`: Integrates with the DCPE-js library
 4. **React Integration**: A custom hook for easy use in React components
 5. **Standalone Functions**: Utility functions for use outside of React components
+6. **Session Management**: Persistence layer for maintaining keys across page refreshes and browser tabs
 
 ### Directory Structure
 
@@ -34,6 +35,8 @@ src/
         ├── KeyManagementService.ts      # Main service class
         ├── useKeyManagement.ts          # React hook
         ├── cryptoUtils.ts               # Helper functions
+        ├── sessionKeyManager.ts         # Session storage for key persistence
+        ├── promptUtils.ts               # Utilities for key initialization
         └── providers/
             ├── DatabaseKeyStorage.ts    # Database storage provider
             ├── LocalStorageKeyStorage.ts # Local storage provider
@@ -50,8 +53,8 @@ Defines the core interfaces for the provider pattern:
 ```typescript
 export interface KeyStorageProvider {
   fetchKeys(userId: string | null): Promise<string | null>;
-  storeKeys(userId: string | null, encryptedKeys: string): Promise<boolean>;
-  clearKeys?(userId: string | null): void;
+  storeKeys(userId: string | null, encryptedKeys: string): Promise<StorageResult>;
+  clearKeys?(userId: string | null): Promise<void>;
 }
 
 export interface CryptoProvider {
@@ -82,6 +85,7 @@ The core service that implements the key management logic:
   - `loadDcpeKeys()`: Loads keys based on configured strategy (database → localStorage → generate)
   - `generateAndStoreDcpeKeys()`: Creates and stores new DCPE keys
   - `decryptAndSetDcpeKeys(encryptedKeys: string)`: Handles decryption of stored keys
+  - `clear()`: Cleans up all key data when logging out
   - `encryptText()`, `encryptMetadata()`, `encryptVector()`: Public encryption methods
   - `decryptText()`, `decryptMetadata()`, `decryptVector()`: Public decryption methods
 
@@ -90,6 +94,7 @@ The core service that implements the key management logic:
   - Prioritized loading strategy for keys
   - Cross-device synchronization
   - Error handling and proper cleanup
+  - User state awareness
 
 ### 3. React Hook: `Confidential-Copilot\src\services\keyManagement\useKeyManagement.ts`
 
@@ -97,18 +102,30 @@ Provides a React-friendly way to access the key management service:
 
 ```typescript
 export function useKeyManagement() {
-  const [service, setService] = useState<KeyManagementService | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const symmetricKey = useAuthStore((state) => state.decryptedSymmetricKey);
-  const user = useAuthStore((state) => state.user);
+  const [state, setState] = useState<KeyManagementState>({
+    isInitialized: false,
+    isLoading: false,
+    error: null
+  });
   
-  // Initialize service when auth state changes
+  const user = useAuthStore((state) => state.user);
+  const symmetricKey = useAuthStore((state) => state.decryptedSymmetricKey);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated());
+  
+  // Initialize and manage key service based on auth state
   useEffect(() => {
     // Implementation details...
-  }, [user, symmetricKey]);
+  }, [isAuthenticated, user, symmetricKey]);
 
-  return { service, isLoading, error };
+  // Session recovery functionality
+  // ...
+
+  return {
+    ...state,
+    service: keyManagementService,
+    ensureInitialized,
+    // Helper methods for encryption/decryption
+  };
 }
 ```
 
@@ -154,6 +171,7 @@ Export file that provides access to all key management components:
 export { keyManagementService } from './KeyManagementService';
 export { useKeyManagement } from './useKeyManagement';
 export { encryptText, encryptMetadata, encryptVector } from './cryptoUtils';
+export { ensureKeyManagementInitialized } from './promptUtils';
 ```
 
 ### 6. Utility Functions: `Confidential-Copilot\src\services\keyManagement\cryptoUtils.ts`
@@ -164,33 +182,42 @@ Standalone utility functions for encryption outside of React components:
 - `encryptMetadata(metadata: string, symmetricKey?: CryptoKey)`: Encrypts metadata deterministically
 - `encryptVector(vector: number[], symmetricKey?: CryptoKey)`: Encrypts vector data
 
+### 7. Session Management: `Confidential-Copilot\src\services\keyManagement\sessionKeyManager.ts`
+
+Provides functionality for managing key persistence across sessions and tabs:
+
+- `storeSymmetricKeyInSession(key: CryptoKey)`: Securely stores the key in session storage
+- `getSymmetricKeyFromSession()`: Retrieves and imports the key from session storage
+- `clearSessionKey()`: Removes the key from session storage during logout
+
 ## Modified Files
 
 ### 1. Auth Store: `Confidential-Copilot\src\store\authStore.ts`
 
-- Replaced imports of `encryptionService` with `keyManagementService`
-- Updated login, storeGeneratedKeys, and recoverWithKey functions to use the new key management service
-- Removed dual initialization approach since the app is still in development
+- Implements the `KeyManagementService` integration throughout the authentication flow
+- Handles key persistence across sessions and browser tabs
+- Manages key recovery and password reset functionality
+- Implements cross-tab session synchronization
 
 ### 2. Document Processing: `Confidential-Copilot\src\lib\processingUtils.ts`
 
-- Updated imports to use encryption functions from the new key management service
-- Replaced `encryptText`, `encryptMetadata`, and `encryptVector` imports
+- Uses encryption functions from the key management service
+- Handles document encryption with proper key initialization checks
 
 ### 3. Client Processing: `Confidential-Copilot\src\lib\clientProcessing.ts`
 
-- Updated imports to use encryption functions from the new key management service
-- Replaced `encryptText`, `encryptMetadata`, and `encryptVector` imports
+- Integrates with the key management service for client-side encryption
+- Ensures key availability before encryption operations
 
 ### 4. Document Uploader: `Confidential-Copilot\src\components\documents\DocumentUploader.tsx`
 
-- Replaced `useEncryptionService` hook with `useKeyManagement`
-- Updated service variable name from `encryptionService` to match the new hook's return value
+- Uses the `useKeyManagement` hook for secure document processing
+- Implements proper loading states during key initialization
 
 ### 5. Project Page: `Confidential-Copilot\src\app\projects\[id]\page.tsx`
 
-- Replaced `useEncryptionService` hook with `useKeyManagement`
-- Updated service variable name from `encryptionService` to match the new hook's return value
+- Integrates with the key management service for project data encryption
+- Handles key initialization and error states gracefully
 
 ## Key Features and Benefits
 
@@ -226,13 +253,13 @@ The service maintains zero-trust principles:
 - Plaintext keys exist only in memory
 - DCPE keys are encrypted with the user's symmetric key
 
-### 4. Improved Initialization Flow
+### 4. Session Persistence and Recovery
 
-The service includes specialized initialization for different scenarios:
-- `initialize()`: Standard flow that follows the storage strategy
-- `initializeWithNewKeys()`: Special flow for signup that generates keys immediately
-
-The signup flow has been enhanced to properly generate and store DCPE keys immediately, preventing initialization issues.
+The service includes robust session management:
+- Keys are persisted across page refreshes using session storage
+- Support for multi-tab browsing with key recovery
+- Automatic key recovery when opening new tabs
+- Graceful handling of expired sessions
 
 ### 5. Error Handling
 
@@ -279,4 +306,4 @@ This ensures the `ArrayBuffer` is passed directly to the Web Crypto API's decryp
 
 The Key Management Service provides a robust, modular system for handling encryption keys in the Confidential-Copilot application. Its provider-based architecture ensures clear separation of concerns, making the code more maintainable and extensible. The service maintains zero-trust principles while enabling cross-device consistency for deterministic encryption.
 
-The improvements to the service's initialization flow and the fix for the WebCryptoProvider's decrypt method have resolved issues with the signup process, ensuring DCPE keys are properly generated, stored, and decrypted.
+The session persistence layer ensures a seamless user experience across page refreshes and multiple browser tabs, while maintaining the security of the encryption keys. The service's error handling and recovery mechanisms provide resilience against common issues, ensuring users can always access their encrypted data.

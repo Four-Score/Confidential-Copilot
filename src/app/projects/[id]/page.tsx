@@ -7,10 +7,14 @@ import DocumentList from '@/components/documents/DocumentList';
 import DocumentUploader from '@/components/documents/DocumentUploader';
 import WebsiteUrlInput from '@/components/website/WebsiteUrlInput';
 import WebsitePreview from '@/components/website/WebsitePreview';
+import YoutubeUrlInput from '@/components/youtube/YoutubeUrlInput';
 import { Project } from '@/types/project';
 import { Document, UnencryptedDocument } from '@/types/document';
 import { useKeyManagement } from '@/services/keyManagement';
 import { useDocumentProcessor } from '@/hooks/useDocumentProcessor';
+import YoutubePreview from '@/components/youtube/YoutubePreview';
+import { processYoutubeTranscript } from '@/lib/clientProcessing';
+
 
 export default function ProjectPage() {
   const params = useParams();
@@ -29,10 +33,18 @@ export default function ProjectPage() {
   const [uploadedWebsite, setUploadedWebsite] = useState<UnencryptedDocument | null>(null);
   const [currentUrl, setCurrentUrl] = useState<string | null>(null);
   const [isMeetingMode, setIsMeetingMode] = useState(false);
-  
+  const [showYoutubeInput, setShowYoutubeInput] = useState(false);
+  const [youtubeTranscript, setYoutubeTranscript] = useState<string | null>(null);
+  const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
+  const [isYoutubeIngesting, setIsYoutubeIngesting] = useState(false);
+  const [youtubeDocs, setYoutubeDocs] = useState<UnencryptedDocument[]>([]);
   // Get encryption service
-  const { service: encryptionService, isLoading: isEncryptionLoading } = useKeyManagement();
-  
+  const { 
+    service: encryptionService, 
+    isLoading: isEncryptionLoading,
+    ensureInitialized 
+  } = useKeyManagement();
+
   // Get document processor
   const { 
     processFile, 
@@ -74,12 +86,29 @@ export default function ProjectPage() {
         // Decrypt document names if encryption service is available
         let decryptedDocuments = documentsData;
         
-        if (encryptionService && Array.isArray(documentsData)) {
-          decryptedDocuments = documentsData.map(doc => ({
-            ...doc,
-            name: encryptionService.decryptMetadata(doc.name)
-          }));
+        try {
+          if (encryptionService && Array.isArray(documentsData)) {
+            // Make sure KMS is initialized
+            await ensureInitialized();
+            
+            // Now process all documents
+            decryptedDocuments = await Promise.all(documentsData.map(async (doc) => {
+              try {
+                const decryptedName = await encryptionService.decryptMetadata(doc.name);
+                return {
+                  ...doc,
+                  name: decryptedName || doc.name
+                };
+              } catch (error) {
+                console.error('Failed to decrypt document name:', error);
+                return doc;
+              }
+            }));
+          }
+        } catch (error) {
+          console.error('Error during document name decryption:', error);
         }
+
         
         setDocuments(Array.isArray(decryptedDocuments) ? decryptedDocuments : []);
         
@@ -95,6 +124,18 @@ export default function ProjectPage() {
           console.error('Error fetching websites:', websiteError);
           // Non-critical error, we can still continue
         }
+
+        // Fetch YouTube docs for this project
+        try {
+          const youtubeResponse = await fetch(`/api/projects/${projectId}/youtube`);
+          if (youtubeResponse.ok) {
+            const youtubeData = await youtubeResponse.json();
+            setYoutubeDocs(Array.isArray(youtubeData.youtube) ? youtubeData.youtube : []);
+          }
+        } catch (youtubeError) {
+          console.error('Error fetching YouTube docs:', youtubeError);
+          // Non-critical error, continue
+        }
       } catch (err) {
         console.error('Error fetching project data:', err);
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
@@ -109,13 +150,19 @@ export default function ProjectPage() {
   }, [projectId, encryptionService]);
 
   // Handle document upload completion
-  const handleDocumentUpload = (newDocument: Document) => {
+  const handleDocumentUpload = async (newDocument: Document) => {
     // Decrypt the new document's name if encryption service is available
     if (encryptionService) {
-      newDocument = {
-        ...newDocument,
-        name: encryptionService.decryptMetadata(newDocument.name)
-      };
+      try {
+        await ensureInitialized();
+        const decryptedName = await encryptionService.decryptMetadata(newDocument.name);
+        newDocument = {
+          ...newDocument,
+          name: decryptedName || newDocument.name
+        };
+      } catch (error) {
+        console.error('Error decrypting document name:', error);
+      }
     }
     setUploadedDocument(newDocument);
     setUploadSuccess(true);
@@ -171,6 +218,76 @@ export default function ProjectPage() {
     } catch (err) {
       console.error('Error processing website:', err);
       setError(err instanceof Error ? err.message : 'Failed to process website');
+    }
+  };
+
+  const handleYoutubeInputCancel = () => {
+    setShowYoutubeInput(false);
+    setCurrentUrl(null);
+    reset();
+  };
+
+  const handleYoutubeUrlSubmit = async (url: string) => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/youtube-transcript`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ video_url: url }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to fetch transcript');
+      setYoutubeTranscript(data.transcript);
+      setYoutubeVideoId(data.videoId);
+      setShowYoutubeInput(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch transcript');
+    }
+  };
+
+  const handleYoutubeIngest = async () => {
+    if (!youtubeVideoId || !youtubeTranscript) return;
+    setIsYoutubeIngesting(true);
+    try {
+      const result = await processYoutubeTranscript(
+        projectId,
+        youtubeTranscript,
+        youtubeVideoId,
+        `https://www.youtube.com/watch?v=${youtubeVideoId}`,
+        'Video Title'
+      );
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to ingest YouTube data');
+      }
+      // Optionally refresh documents or show a success message
+      setYoutubeTranscript(null);
+      setYoutubeVideoId(null);
+      // Optionally, refresh the project data to show the new document
+      // await fetchProjectData();
+      handleBackToProject();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to ingest YouTube data');
+    }finally {
+      setIsYoutubeIngesting(false);
+    }
+  };
+
+  const handleDeleteYoutube = async (youtubeId: string) => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/youtube/${youtubeId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete YouTube video');
+      }
+      setYoutubeDocs(prev => prev.filter(doc => doc.id !== youtubeId));
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting YouTube video:', err);
+      return { 
+        success: false, 
+        error: err instanceof Error ? err.message : 'An unknown error occurred'
+      };
     }
   };
 
@@ -264,8 +381,8 @@ export default function ProjectPage() {
           </button>
           
           <button
-            className="flex flex-col items-center justify-center p-4 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors cursor-not-allowed opacity-70"
-            disabled
+            onClick={() => setShowYoutubeInput(true)}
+            className="flex flex-col items-center justify-center p-4 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-green-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -373,6 +490,46 @@ export default function ProjectPage() {
     );
   }
 
+  // Show YouTube URL input if the YouTube button was clicked
+  if (showYoutubeInput) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <ProjectHeader project={project} />
+        <div className="mb-8">
+          <YoutubeUrlInput
+            onUrlSubmit={handleYoutubeUrlSubmit}
+            onCancel={handleYoutubeInputCancel}
+            isLoading={isProcessing}
+            progress={progress}
+            currentStep={status}
+            error={processingError}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Show YouTube transcript and video preview if available
+  if (youtubeTranscript && youtubeVideoId) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <ProjectHeader project={project} />
+        <div className="mb-8">
+          <YoutubePreview
+            videoId={youtubeVideoId}
+            transcript={youtubeTranscript}
+            onBack={handleBackToProject}
+            onConfirm={handleYoutubeIngest}
+            isProcessing={isYoutubeIngesting || isProcessing}
+            progress={progress}
+            status={status}
+            error={processingError}
+          />
+        </div>
+      </div>
+    );
+  }
+
   // Show document uploader if the upload button was clicked
   if (showUploader) {
     return (
@@ -416,7 +573,7 @@ export default function ProjectPage() {
   }
 
   // Combine documents and websites for display
-  const allDocuments = [...documents, ...websites];
+  const allDocuments = [...documents, ...websites,...youtubeDocs];
   
   // Normal project page view with data ingestion buttons and document list
   return (
@@ -434,6 +591,7 @@ export default function ProjectPage() {
           documents={allDocuments} 
           onDelete={handleDeleteDocument}
           onWebsiteDelete={handleDeleteWebsite} 
+          onYoutubeDelete={handleDeleteYoutube}
         />
       ) : (
         <div className="bg-gray-50 rounded-lg p-6 text-center">
