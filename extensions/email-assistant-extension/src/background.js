@@ -1,11 +1,8 @@
 // Background script for the Email Assistant extension
 import { createClient } from '@supabase/supabase-js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../src/secret';
 
-const supabase = createClient(
-  'https://tczdnhbosuoqmgkpqnaz.supabase.co'
-  ,'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRjemRuaGJvc3VvcW1na3BxbmF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM2NzUwMDAsImV4cCI6MjA1OTI1MTAwMH0.RCg2REt0dl56FxPuTE6E2pEpt_uf5i9V8sngHwwt9Bc'
-
-);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 chrome.runtime.onInstalled.addListener(() => {
   console.log('Email Assistant extension installed');
   chrome.storage.local.get(['email_assistant_emails'], (result) => {

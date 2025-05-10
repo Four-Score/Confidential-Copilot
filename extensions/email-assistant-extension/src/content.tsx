@@ -66,7 +66,16 @@ const addFloatingActionButton = (): void => {
   const button = document.createElement('div');
   button.id = 'email-assistant-fab';
   button.className = 'email-assistant-fab';
-  button.innerHTML = '⚡';
+
+  const img = document.createElement('img');
+  img.src = chrome.runtime.getURL('assets/cc-logo.png'); // Ensure this image exists in your /assets folder
+  img.alt = 'CC Logo';
+  img.style.width = '100%';
+  img.style.height = '100%';
+  img.style.objectFit = 'cover';
+  img.style.borderRadius = '10%';
+
+  button.appendChild(img);
   button.title = 'Analyze Email with Confidential Copilot';
 
   button.addEventListener('click', () => {
@@ -77,6 +86,8 @@ const addFloatingActionButton = (): void => {
 
   document.body.appendChild(button);
 };
+
+
 
 const setupUrlChangeDetection = (): void => {
   let lastUrl = location.href;
@@ -109,7 +120,7 @@ const initialize = (): void => {
       width: 56px;
       height: 56px;
       border-radius: 50%;
-      background-color: #1a73e8;
+      background-color: #00387b;
       color: white;
       display: flex;
       align-items: center;

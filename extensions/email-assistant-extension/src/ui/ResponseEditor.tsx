@@ -11,6 +11,9 @@ interface ResponseEditorProps {
 const ResponseEditor: React.FC<ResponseEditorProps> = ({ emailSummary, onClose }) => {
   const [tone, setTone] = useState('Formal');
   const [length, setLength] = useState('Standard');
+  const [formality, setFormality] = useState('Formal');
+  const [format, setFormat] = useState('Paragraph');
+  const [includeAttachments, setIncludeAttachments] = useState(false);
   const [additionalContext, setAdditionalContext] = useState('');
   const [response, setResponse] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,7 +22,14 @@ const ResponseEditor: React.FC<ResponseEditorProps> = ({ emailSummary, onClose }
     setLoading(true);
     try {
       const llmService = LLMService.getInstance();
-      const generated = await llmService.generateResponse(emailSummary, { tone, length, additionalContext });
+      const generated = await llmService.generateResponse(emailSummary, {
+        tone,
+        length,
+        formality,
+        format,
+        includeAttachmentReferences: includeAttachments,
+        additionalContext,
+      });
       setResponse(generated);
     } catch (error) {
       console.error('Error generating response:', error);
@@ -34,7 +44,6 @@ const ResponseEditor: React.FC<ResponseEditorProps> = ({ emailSummary, onClose }
       <div className="modal-content">
         <h3>Customize and Generate Response</h3>
 
-        {/* Options */}
         <div className="options-group">
           <label>Tone:</label>
           <select value={tone} onChange={(e) => setTone(e.target.value)}>
@@ -51,6 +60,29 @@ const ResponseEditor: React.FC<ResponseEditorProps> = ({ emailSummary, onClose }
             <option>Detailed</option>
           </select>
 
+          <label>Formality:</label>
+          <select value={formality} onChange={(e) => setFormality(e.target.value)}>
+            <option>Formal</option>
+            <option>Semi-formal</option>
+            <option>Informal</option>
+          </select>
+
+          <label>Format:</label>
+          <select value={format} onChange={(e) => setFormat(e.target.value)}>
+            <option>Paragraph</option>
+            <option>Bullet-points</option>
+            <option>Executive-summary</option>
+          </select>
+
+          <label>
+            <input
+              type="checkbox"
+              checked={includeAttachments}
+              onChange={(e) => setIncludeAttachments(e.target.checked)}
+            />
+            Mention attachments in response
+          </label>
+
           <label>Additional Instructions:</label>
           <textarea
             value={additionalContext}
@@ -59,7 +91,6 @@ const ResponseEditor: React.FC<ResponseEditorProps> = ({ emailSummary, onClose }
           />
         </div>
 
-        {/* Buttons */}
         <div className="button-group">
           <button onClick={handleGenerate} className="main-button" disabled={loading}>
             {loading ? 'Generating...' : 'Generate'}
@@ -69,7 +100,6 @@ const ResponseEditor: React.FC<ResponseEditorProps> = ({ emailSummary, onClose }
           </button>
         </div>
 
-        {/* Generated Response */}
         {response && (
           <div className="response-box">
             <h4>Generated Response:</h4>

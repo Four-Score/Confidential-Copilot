@@ -1,13 +1,12 @@
+
 import React, { useState } from 'react';
-import { IEmailData, IEmailEntities } from '../interfaces/IEmailModels';
+import { IEmailData, IEmailEntities, IEmailAttachment } from '../interfaces/IEmailModels';
 import ResponseEditor from './ResponseEditor';
 import '../styles.css';
 import { createClient } from '@supabase/supabase-js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../../src/secret';
 
-const supabase = createClient(
-  'https://tczdnhbosuoqmgkpqnaz.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRjemRuaGJvc3VvcW1na3BxbmF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM2NzUwMDAsImV4cCI6MjA1OTI1MTAwMH0.RCg2REt0dl56FxPuTE6E2pEpt_uf5i9V8sngHwwt9Bc'
-);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 interface EmailPreviewProps {
   emailData: IEmailData;
@@ -18,57 +17,42 @@ interface EmailPreviewProps {
 
 const EmailPreview: React.FC<EmailPreviewProps> = ({ emailData, entities, emailSummary, onClose }) => {
   const [showResponseEditor, setShowResponseEditor] = useState(false);
+  const [attachments, setAttachments] = useState<IEmailAttachment[]>([...emailData.attachments]);
 
   const handleGenerateResponse = () => {
     setShowResponseEditor(true);
   };
 
+  const handleRemoveAttachment = (id: string) => {
+    setAttachments(prev => prev.filter(att => att.id !== id));
+  };
+
   const handleSaveToDashboard = async () => {
-    if (!emailSummary) {
-      console.warn('No summary available to save.');
-      return;
+    const projectName = prompt('Enter project name:');
+    if (!projectName) return alert('No project name provided.');
+
+    const session = await new Promise<any>((resolve) =>
+      chrome.storage.local.get(['supabaseSession'], result => resolve(result.supabaseSession))
+    );
+
+    if (!session?.access_token || !session?.refresh_token) {
+      return alert('❌ Not authenticated. Please log in again.');
     }
-  
-    const projectName = prompt('Enter the project name to save this email under:');
-    if (!projectName) {
-      alert('No project name provided.');
-      return;
-    }
-  
-    // 1. Get Supabase session from Chrome storage (wrapped in a Promise)
-    const supabaseSession = await new Promise<any>((resolve) => {
-      chrome.storage.local.get(['supabaseSession'], (result) => {
-        resolve(result.supabaseSession);
-      });
-    });
-  
-    if (!supabaseSession?.access_token || !supabaseSession?.refresh_token) {
-      alert('❌ Not authenticated. Please log in again.');
-      return;
-    }
-  
-    // 2. Set the session
+
     await supabase.auth.setSession({
-      access_token: supabaseSession.access_token,
-      refresh_token: supabaseSession.refresh_token,
+      access_token: session.access_token,
+      refresh_token: session.refresh_token
     });
-  
-    // 3. Fetch project ID
+
     const { data, error } = await supabase
       .from('projects')
       .select('id')
       .eq('name', projectName.trim())
       .single();
-  
-    if (error || !data?.id) {
-      alert('❌ Could not find a project with that name.');
-      return;
-    }
-  
-    const projectId = data.id;
-  
-    // 4. Add to queue
-    const emailPayload = {
+
+    if (error || !data?.id) return alert('❌ Could not find project.');
+
+    const payload = {
       id: crypto.randomUUID(),
       subject: emailData.subject,
       sender: emailData.sender,
@@ -76,51 +60,74 @@ const EmailPreview: React.FC<EmailPreviewProps> = ({ emailData, entities, emailS
       timestamp: emailData.timestamp,
       summary: emailSummary,
       entities,
+      attachments,
       projectName,
-      projectId
+      projectId: data.id
     };
-  
+
     chrome.storage.local.get(['email_queue'], (result) => {
       const queue = result.email_queue || [];
-      queue.push(emailPayload);
-  
+      queue.push(payload);
       chrome.storage.local.set({ email_queue: queue }, () => {
-        alert(`✅ Email queued under project "${projectName}". It will be processed when you open the app.`);
+        alert(`✅ Email saved under "${projectName}"`);
       });
     });
   };
-  
+
+  const formatSize = (bytes: number) => {
+    if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)} MB`;
+    if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${bytes} B`;
+  };
+
   return (
     <div className="email-preview-wrapper">
       <div className="email-preview-header">
-        <h2>Confidential Copilot</h2>
-        <button onClick={onClose}>Close ✖️</button>
+        <h2 className="header-title">Confidential Copilot</h2>
+        <button onClick={onClose}>✖️</button>
       </div>
 
-      <div className="email-preview-body">
-        <h3>{emailData.subject}</h3>
-        <p><strong>From:</strong> {emailData.sender}</p>
-        <p><strong>Date:</strong> {new Date(emailData.timestamp).toLocaleString()}</p>
+      <div className="email-metadata">
+        <p className="email-subject">{emailData.subject}</p>
+        <p className="metadata-row"><span className="metadata-label">From:</span> {emailData.sender}</p>
+        <p className="metadata-row"><span className="metadata-label">Date:</span> {new Date(emailData.timestamp).toLocaleString()}</p>
+      </div>
 
+      <div className="tab-content">
         <h4>Email Summary:</h4>
-        <p>{emailSummary}</p>
-
-        <h4>Key Points:</h4>
-        <ul>
-          {entities.keyPoints.map((point, idx) => (
-            <li key={idx}>{point}</li>
+        <ul className="summary-list">
+          {emailSummary.split('\n').filter(Boolean).map((line, idx) => (
+            <li key={idx} className="summary-item">• {line.trim()}</li>
           ))}
         </ul>
 
-        <div className="actions">
-          <button onClick={handleGenerateResponse} className="main-button">
-            Generate Response
-          </button>
+        <h4 style={{ marginTop: '1rem' }}>Key Points:</h4>
+        <ul className="summary-list">
+          {entities.keyPoints.length > 0 ? (
+            entities.keyPoints.map((point, idx) => (
+              <li key={idx} className="summary-item">✔ {point}</li>
+            ))
+          ) : (
+            <li className="summary-item">No key points detected.</li>
+          )}
+        </ul>
 
-          <button onClick={handleSaveToDashboard} className="secondary-button" style={{ marginTop: '10px' }}>
-            Save to Dashboard
-          </button>
-        </div>
+        {attachments.length > 0 && (
+          <div className="email-attachments">
+            <h4>Attachments:</h4>
+            {attachments.map(att => (
+              <div key={att.id} className="attachment-card">
+                <span>📎 {att.name} ({formatSize(att.size)})</span>
+                <button className="remove-button" onClick={() => handleRemoveAttachment(att.id)}>Remove</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="modal-actions">
+        <button className="respond-button" onClick={handleGenerateResponse}>Generate Response</button>
+        <button className="save-button" onClick={handleSaveToDashboard}>Save to Dashboard</button>
       </div>
 
       {showResponseEditor && (

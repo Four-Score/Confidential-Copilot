@@ -14,12 +14,9 @@
   "host_permissions": [
     "https://mail.google.com/*", 
     "https://www.googleapis.com/*",
-    "https://gmail.googleapis.com/*"
+    "https://gmail.googleapis.com/*",
+    "https://tczdnhbosuoqmgkpqnaz.supabase.co/*"
   ],
-  "action": {
-    "default_popup": "popup.html",
-    "default_title": "Confidential Copilot: Email Mode"
-  },
   "background": {
     "service_worker": "background.js"
   },
@@ -31,7 +28,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["assets/*"],
+      "resources": ["assets/cc-logo.png"],
       "matches": ["https://mail.google.com/*"]
     },
     {

@@ -54,14 +54,18 @@ module.exports = {
   
     // Copy all public files except auth.html to avoid conflict
     new CopyPlugin({
-      patterns: [
-        {
-          from: 'public',
-          to: '.',
-          filter: (resourcePath) => !resourcePath.endsWith('auth.html'), // ⛔ Skip auth.html
-        },
-      ],
-    }),
+  patterns: [
+    {
+      from: 'public',
+      to: '.',
+      filter: (resourcePath) => !resourcePath.endsWith('auth.html'),
+    },
+    {
+      from: 'assets',
+      to: 'assets', // ⬅️ This ensures assets/cc-logo.png ends up in dist/assets
+    },
+  ],
+}),
   
     new webpack.DefinePlugin({
       'process.env.GROQ_API_KEY': JSON.stringify(process.env.GROQ_API_KEY || ''),

@@ -2,8 +2,8 @@
 
 import { IEmailService } from '../interfaces/IEmailService';
 import { IEmailData, IEmailAttachment } from '../interfaces/IEmailModels';
-import { Summarizer } from '../utils/summarizer'; // <-- Import Summarizer
-import { LLMService, GenerateOptions } from './LLMService'; // <-- Import LLM Service
+import { Summarizer } from '../utils/summarizer';
+import { LLMService, GenerateOptions } from './LLMService';
 
 export class GmailApiService implements IEmailService {
   private static instance: GmailApiService;
@@ -21,11 +21,11 @@ export class GmailApiService implements IEmailService {
   public async initialize(): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
       chrome.runtime.sendMessage({ action: 'getAuthToken' }, (response) => {
-        if (response && response.success) {
+        if (response?.success) {
           this.accessToken = response.token;
           resolve(true);
         } else {
-          console.error('Error getting auth token:', response?.error);
+          console.error('[GmailApiService] Auth token error:', response?.error);
           resolve(false);
         }
       });
@@ -34,84 +34,57 @@ export class GmailApiService implements IEmailService {
 
   public async extractCurrentEmail(): Promise<IEmailData | null> {
     const emailId = this.getEmailIdFromDOM();
-
     if (!emailId) {
-      console.error('[Confidential Copilot] Could not extract email ID from DOM.');
+      console.error('[GmailApiService] Could not extract email ID from DOM.');
       return null;
     }
-
-    console.log('[Confidential Copilot] Extracted email ID from DOM:', emailId);
 
     const email = await this.fetchEmail(emailId);
     return email;
   }
 
-  // New method to summarize email and generate response
   public async summarizeAndGenerateResponse(
     emailId: string,
     options: GenerateOptions
   ): Promise<string | null> {
     const email = await this.fetchEmail(emailId);
     if (!email || !email.body) {
-      console.error('No email body found to summarize.');
+      console.error('[GmailApiService] Email body missing for summarization.');
       return null;
     }
-  
-    let contentToSend: string;
-  
-    // If email is short (less than ~500 characters), skip summarization
-    if (email.body.length < 500) {
-      console.log('[Confidential Copilot] Email is short. Skipping summarization.');
-      contentToSend = email.body;
-    } else {
-      const summary = await Summarizer.summarize(email.body);
-      console.log('[Confidential Copilot] Email Summary:', summary);
-      contentToSend = summary;
-    }
-  
+
+    // Always summarize the email
+    const summary = await Summarizer.summarize(email.body);
+    console.log('[GmailApiService] Generated Summary:', summary);
+
     const llmService = LLMService.getInstance();
-    const generatedResponse = await llmService.generateResponse(contentToSend, options);
-    return generatedResponse;
-  }  
-  
+    return await llmService.generateResponse(summary, options);
+  }
+
   private getEmailIdFromDOM(): string | null {
     try {
       const threads = document.querySelectorAll('[data-legacy-message-id]');
-      const ids: string[] = [];
+      const ids = Array.from(threads)
+        .map(node => node.getAttribute('data-legacy-message-id'))
+        .filter(Boolean) as string[];
 
-      threads.forEach((node) => {
-        const id = node.getAttribute('data-legacy-message-id');
-        if (id) ids.push(id);
-      });
-
-      if (ids.length === 0) return null;
-
-      return ids[ids.length - 1]; // last email in the thread
+      return ids.length > 0 ? ids[ids.length - 1] : null;
     } catch (err) {
-      console.error('[Confidential Copilot] Failed to extract email ID from DOM:', err);
+      console.error('[GmailApiService] Failed to extract email ID:', err);
       return null;
     }
   }
 
   private async fetchEmail(emailId: string): Promise<IEmailData | null> {
-    if (!emailId) {
-      console.error('Email ID is missing or invalid.');
-      return null;
-    }
-
-    return new Promise<IEmailData | null>((resolve) => {
-      chrome.runtime.sendMessage(
-        { action: 'fetchEmail', emailId },
-        (response) => {
-          if (response && response.success) {
-            const emailData = this.processGmailMessage(response.data);
-            resolve(emailData);
-          } else {
-            console.error('Error fetching email:', response?.error);
-            resolve(null);
-          }
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action: 'fetchEmail', emailId }, (response) => {
+        if (response?.success && response.data) {
+          resolve(this.processGmailMessage(response.data));
+        } else {
+          console.error('[GmailApiService] Error fetching email:', response?.error);
+          resolve(null);
         }
-      );
+      });
     });
   }
 
@@ -123,15 +96,16 @@ export class GmailApiService implements IEmailService {
 
     let body = '';
     if (message.payload.body?.data) {
-      body = this.decodeBase64(message.payload.body.data);
-    } else if (message.payload.parts) {
-      const part = message.payload.parts.find(
-        (p: any) => p.mimeType === 'text/plain' || p.mimeType === 'text/html'
-      );
-      if (part?.body?.data) {
-        body = this.decodeBase64(part.body.data);
-      }
-    }
+  body = this.decodeBase64(message.payload.body.data);
+} else if (message.payload.parts) {
+  const part = message.payload.parts.find(
+    (p: any) => p.mimeType === 'text/plain' || p.mimeType === 'text/html'
+  );
+  if (part?.body?.data) {
+    body = this.decodeBase64(part.body.data);
+  }
+}
+
 
     const attachments: IEmailAttachment[] = [];
     this.extractAttachments(message.payload, attachments, message.id);
@@ -156,13 +130,13 @@ export class GmailApiService implements IEmailService {
           .join('')
       );
     } catch (error) {
-      console.error('Error decoding base64 email content:', error);
+      console.error('[GmailApiService] Base64 decode error:', error);
       return '';
     }
   }
 
-  private extractAttachments(part: any, attachments: IEmailAttachment[], emailId: string, parentPart?: string): void {
-    if (part.filename && part.filename.length > 0 && part.body) {
+  private extractAttachments(part: any, attachments: IEmailAttachment[], emailId: string): void {
+    if (part.filename && part.body) {
       const attachmentId = part.body.attachmentId;
       attachments.push({
         id: attachmentId || `att_${Date.now()}_${attachments.length}`,
@@ -175,25 +149,22 @@ export class GmailApiService implements IEmailService {
       });
     }
 
-    if (part.parts && part.parts.length > 0) {
-      part.parts.forEach((subPart: any, index: number) => {
-        const subPartId = parentPart ? `${parentPart}.${index + 1}` : `${index + 1}`;
-        this.extractAttachments(subPart, attachments, emailId, subPartId);
-      });
-    }
+    if (Array.isArray(part.parts)) {
+      part.parts.forEach((sub: any) => this.extractAttachments(sub, attachments, emailId));
+}
   }
 
-  public async getAttachments(emailId: string): Promise<IEmailData['attachments']> {
+  public async getAttachments(emailId: string): Promise<IEmailAttachment[]> {
     const email = await this.fetchEmail(emailId);
     return email?.attachments || [];
   }
 
   public async downloadAttachment(emailId: string, attachmentId: string): Promise<Blob | null> {
-    return new Promise<Blob | null>((resolve) => {
+    return new Promise((resolve) => {
       chrome.runtime.sendMessage(
         { action: 'fetchAttachment', emailId, attachmentId },
         (response) => {
-          if (response && response.success && response.data?.data) {
+          if (response?.success && response.data?.data) {
             const binary = atob(response.data.data.replace(/-/g, '+').replace(/_/g, '/'));
             const bytes = new Uint8Array(binary.length);
             for (let i = 0; i < binary.length; i++) {
@@ -201,7 +172,7 @@ export class GmailApiService implements IEmailService {
             }
             resolve(new Blob([bytes]));
           } else {
-            console.error('Error downloading attachment:', response?.error);
+            console.error('[GmailApiService] Attachment download failed:', response?.error);
             resolve(null);
           }
         }
@@ -217,10 +188,10 @@ export class GmailApiService implements IEmailService {
         return true;
       }
       await navigator.clipboard.writeText(response);
-      alert('Response copied to clipboard! Paste it manually.');
+      alert('Response copied to clipboard. Paste it manually.');
       return true;
     } catch (error) {
-      console.error('Failed to insert response:', error);
+      console.error('[GmailApiService] insertResponse failed:', error);
       return false;
     }
   }
@@ -240,20 +211,15 @@ export class GmailApiService implements IEmailService {
       body
     ].join('\r\n');
 
-    const base64EncodedEmail = btoa(email).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const encodedEmail = btoa(email)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
 
-    return new Promise<boolean>((resolve) => {
-      chrome.runtime.sendMessage(
-        { action: 'sendEmail', raw: base64EncodedEmail },
-        (response) => {
-          if (response && response.success) {
-            resolve(true);
-          } else {
-            console.error('Error sending email:', response?.error);
-            resolve(false);
-          }
-        }
-      );
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action: 'sendEmail', raw: encodedEmail }, (response) => {
+        resolve(response?.success === true);
+      });
     });
   }
 }
