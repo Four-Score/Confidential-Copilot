@@ -4,14 +4,28 @@ import React, { useState } from 'react';
 import { useChatContext } from '@/contexts/ChatContext';
 import { ChatModel, ChatSettings } from '@/types/chat';
 import { validateSettings } from '@/config/modelConfig';
+import { useModelSwitching } from '@/hooks/useModelSwitching';
+import ComprehensiveSettings from './ComprehensiveSettings';
+
+
 
 export default function ModelSelection() {
-  const { chatState, availableModels, setModel, updateSettings } = useChatContext();
+  const { chatState, updateSettings } = useChatContext();
+  const { 
+    currentModel, 
+    availableModels,
+    compatibleModels,
+    switchModel,
+    isSwitching, 
+    error 
+  } = useModelSwitching();
+  
   const [isOpen, setIsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
+  
   // Get current model data
-  const currentModel = availableModels.find(model => model.id === chatState.modelId) || availableModels[0];
+  const selectedModel = availableModels.find(model => model.id === chatState.modelId) || availableModels[0];
 
   // Close dropdowns when clicking outside
   const handleClickOutside = (e: MouseEvent) => {
@@ -38,9 +52,11 @@ export default function ModelSelection() {
   }, [isOpen, isSettingsOpen]);
 
   // Handle model change
-  const handleModelChange = (modelId: string) => {
-    setModel(modelId);
-    setIsOpen(false);
+  const handleModelChange = async (modelId: string) => {
+    const success = await switchModel(modelId, true);
+    if (success) {
+      setIsOpen(false);
+    }
   };
 
   // Handle settings change
@@ -57,24 +73,33 @@ export default function ModelSelection() {
     <div className="relative" data-model-dropdown>
       {/* Model selector button */}
       <div 
-        className="flex items-center gap-2 px-3 py-2 rounded-md border border-gray-300 hover:bg-gray-50 cursor-pointer text-sm"
+        className={`
+          flex items-center gap-2 px-3 py-2 rounded-md border border-gray-300 
+          ${isSwitching ? 'bg-gray-100 cursor-wait' : 'hover:bg-gray-50 cursor-pointer'}
+        `}
         onClick={() => {
-          setIsOpen(!isOpen);
-          setIsSettingsOpen(false);
+          if (!isSwitching) {
+            setIsOpen(!isOpen);
+            setIsSettingsOpen(false);
+          }
         }}
       >
         <span className="font-medium truncate max-w-[120px]">
-          {currentModel.name}
+          {currentModel?.name || 'Select Model'}
         </span>
-        <svg 
-          xmlns="http://www.w3.org/2000/svg" 
-          className={`h-4 w-4 text-gray-500 transition-transform ${isOpen ? 'transform rotate-180' : ''}`}
-          fill="none" 
-          viewBox="0 0 24 24" 
-          stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        {isSwitching ? (
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"></div>
+        ) : (
+          <svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            className={`h-4 w-4 text-gray-500 transition-transform ${isOpen ? 'transform rotate-180' : ''}`}
+            fill="none" 
+            viewBox="0 0 24 24" 
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        )}
       </div>
       
       {/* Settings button */}
@@ -116,168 +141,66 @@ export default function ModelSelection() {
             <div className="px-3 py-2 text-sm font-medium text-gray-700 border-b border-gray-100">
               Select Model
             </div>
-            {availableModels.map(model => (
-              <div
-                key={model.id}
-                className={`px-3 py-2 flex items-center justify-between cursor-pointer hover:bg-gray-50 ${
-                  model.id === currentModel.id ? 'bg-blue-50 text-blue-700' : ''
-                }`}
-                onClick={() => handleModelChange(model.id)}
-              >
-                <div>
-                  <div className="text-sm font-medium">{model.name}</div>
-                  <div className="text-xs text-gray-500">{model.description}</div>
+            {availableModels.map(model => {
+              const isCompatible = compatibleModels.some(m => m.id === model.id);
+              const isSelected = model.id === chatState.modelId;
+              
+              return (
+                <div
+                  key={model.id}
+                  className={`
+                    px-3 py-2 flex items-center justify-between 
+                    ${!isCompatible && !isSelected ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'} 
+                    ${isSelected ? 'bg-blue-50 text-blue-700' : ''}
+                  `}
+                  onClick={() => isCompatible || isSelected ? handleModelChange(model.id) : null}
+                >
+                  <div>
+                    <div className="text-sm font-medium flex items-center">
+                      {model.name}
+                      {!isCompatible && !isSelected && (
+                        <span className="ml-2 px-1.5 py-0.5 text-xs bg-amber-100 text-amber-800 rounded">
+                          Too small
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-500">{model.description}</div>
+                  </div>
+                  {isSelected && (
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5 text-blue-600"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  )}
                 </div>
-                {model.id === currentModel.id && (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 text-blue-600"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
+          
+          {/* Show error if present */}
+          {error && (
+            <div className="px-3 py-2 text-sm text-red-600 border-t border-gray-100">
+              {error}
+            </div>
+          )}
         </div>
       )}
       
       {/* Settings panel */}
       {isSettingsOpen && (
         <div 
-          className="absolute z-10 mt-2 w-80 rounded-md bg-white shadow-lg border border-gray-200 right-0"
+          className="absolute z-10 mt-2 w-80 right-0"
           data-settings-panel
         >
-          <div className="p-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">Model Settings</h3>
-            
-            {/* Temperature slider */}
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-1">
-                <label htmlFor="temperature" className="text-xs text-gray-700">
-                  Temperature: {chatState.settings.temperature.toFixed(1)}
-                </label>
-                <span className="text-xs text-gray-500">
-                  {chatState.settings.temperature === 0 
-                    ? 'Deterministic' 
-                    : chatState.settings.temperature < 0.5 
-                      ? 'More focused' 
-                      : chatState.settings.temperature > 0.8 
-                        ? 'More creative' 
-                        : 'Balanced'}
-                </span>
-              </div>
-              <input
-                type="range"
-                id="temperature"
-                min="0"
-                max="1"
-                step="0.1"
-                value={chatState.settings.temperature}
-                onChange={(e) => handleSettingChange('temperature', parseFloat(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-              />
-              <div className="flex justify-between text-xs text-gray-400 mt-1">
-                <span>0</span>
-                <span>1</span>
-              </div>
-            </div>
-            
-            {/* Max tokens slider */}
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-1">
-                <label htmlFor="maxTokens" className="text-xs text-gray-700">
-                  Max Tokens: {formatNumber(chatState.settings.maxTokens)}
-                </label>
-                <span className="text-xs text-gray-500">
-                  {`Max: ${formatNumber(currentModel.contextWindow - 500)}`}
-                </span>
-              </div>
-              <input
-                type="range"
-                id="maxTokens"
-                min="100"
-                max={currentModel.contextWindow - 500}
-                step="100"
-                value={chatState.settings.maxTokens}
-                onChange={(e) => handleSettingChange('maxTokens', parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-              />
-              <div className="flex justify-between text-xs text-gray-400 mt-1">
-                <span>100</span>
-                <span>{formatNumber(currentModel.contextWindow - 500)}</span>
-              </div>
-            </div>
-            
-            {/* Context settings */}
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-1">
-                <label htmlFor="similarityThreshold" className="text-xs text-gray-700">
-                  Similarity Threshold: {(chatState.settings.similarityThreshold || 0.5).toFixed(2)}
-                </label>
-              </div>
-              <input
-                type="range"
-                id="similarityThreshold"
-                min="0.1"
-                max="0.99"
-                step="0.01"
-                value={chatState.settings.similarityThreshold || 0.5}
-                onChange={(e) => handleSettingChange('similarityThreshold', parseFloat(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-              />
-              <div className="flex justify-between text-xs text-gray-400 mt-1">
-                <span>0.1</span>
-                <span>0.99</span>
-              </div>
-            </div>
-            
-            {/* Max chunks setting */}
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-1">
-                <label htmlFor="maxChunks" className="text-xs text-gray-700">
-                  Max Chunks: {chatState.settings.maxChunks}
-                </label>
-              </div>
-              <input
-                type="range"
-                id="maxChunks"
-                min="1"
-                max="50"
-                step="1"
-                value={chatState.settings.maxChunks}
-                onChange={(e) => handleSettingChange('maxChunks', parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-              />
-              <div className="flex justify-between text-xs text-gray-400 mt-1">
-                <span>1</span>
-                <span>50</span>
-              </div>
-            </div>
-            
-            {/* Show context cards toggle */}
-            <div className="flex items-center justify-between">
-              <label htmlFor="showContextCards" className="text-xs text-gray-700">
-                Show context cards
-              </label>
-              <label className="inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  id="showContextCards"
-                  checked={chatState.settings.showContextCards}
-                  onChange={(e) => handleSettingChange('showContextCards', e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="relative w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-              </label>
-            </div>
-          </div>
+          <ComprehensiveSettings onClose={() => setIsSettingsOpen(false)} />
         </div>
       )}
     </div>

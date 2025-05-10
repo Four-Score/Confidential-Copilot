@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { useRouter } from 'next/navigation';
 import ModelSelection from './ModelSelection';
 import NewChatModal from './NewChatModal';
+import NewChatButton from './NewChatButton';
 
 interface ChatLayoutProps {
   children: React.ReactNode;
@@ -19,7 +20,6 @@ export default function ChatLayout({ children }: ChatLayoutProps) {
 
   // Get project names from the selected project IDs
   const projectCount = chatState.selectedProjectIds.length;
-  const [showNewChatModal, setShowNewChatModal] = useState(false);
 
   
   // Handle new chat button click
@@ -29,18 +29,6 @@ export default function ChatLayout({ children }: ChatLayoutProps) {
     startNewChat(true);
   };
 
-  // Function to handle "New Chat" button click
-const handleNewChatClick = () => {
-  setShowNewChatModal(true);
-};
-
-// And include the NewChatModal component in your JSX:
-{showNewChatModal && (
-  <NewChatModal 
-    isOpen={showNewChatModal}
-    onClose={() => setShowNewChatModal(false)}
-  />
-)}
   
   // Handle model selection dialog
   const [isModelSelectOpen, setIsModelSelectOpen] = useState(false);
@@ -108,32 +96,15 @@ const handleNewChatClick = () => {
           </div>
           
           <div className="flex items-center space-x-3">
-            {/* Model selection */}
-            <ModelSelection />
-            
-            {/* New chat button */}
-            <Button
-              onClick={handleNewChatClick}
-              size="sm"
-              className="flex items-center"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4 mr-1"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                />
-              </svg>
-              New Chat
-            </Button>
-          </div>
+              {/* Model selection */}
+              <ModelSelection />
+              
+              {/* New chat button */}
+              <NewChatButton 
+                size="sm" 
+                className="shadow-sm"
+              />
+            </div>
         </header>
         
         {/* Model selection dropdown (conditionally rendered) */}

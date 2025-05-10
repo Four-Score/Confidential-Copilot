@@ -98,3 +98,47 @@ body {
 .animate-slide-out-right {
   animation: slideOutRight 0.3s ease forwards;
 }
+
+
+/* Loading indicator styles */
+.dot-typing {
+  position: relative;
+  height: 6px;
+  width: 6px;
+  border-radius: 50%;
+  background-color: #3b82f6;
+  animation: dot-typing-bounce 1.5s infinite linear;
+}
+
+.dot-typing:before,
+.dot-typing:after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #3b82f6;
+  animation: dot-typing-bounce 1.5s infinite linear;
+}
+
+.dot-typing:before {
+  left: -12px;
+  animation-delay: -0.3s;
+}
+
+.dot-typing:after {
+  left: 12px;
+  animation-delay: 0.3s;
+}
+
+@keyframes dot-typing-bounce {
+  0%, 80%, 100% { 
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  40% { 
+    transform: scale(1);
+    opacity: 1;
+  }
+}

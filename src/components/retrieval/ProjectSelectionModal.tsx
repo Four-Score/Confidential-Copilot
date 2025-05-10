@@ -80,7 +80,8 @@ export const ProjectSelectionModal: React.FC = () => {
       openModal(MODAL_ROUTES.DATA_SELECTION, { 
         currentView: MODAL_ROUTES.DATA_SELECTION,
         projectId: selectedProject.id, 
-        projectName: selectedProject.name 
+        projectName: selectedProject.name,
+        destination: modalProps.destination
       });
     }
   };

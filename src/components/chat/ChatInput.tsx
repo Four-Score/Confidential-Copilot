@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useChatContext } from '@/contexts/ChatContext';
+import LoadingStates from './LoadingStates';
 
 interface ChatInputProps {
   onSubmit: (message: string) => void;
@@ -18,6 +19,7 @@ export default function ChatInput({
 }: ChatInputProps) {
   const [inputValue, setInputValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isInputEmpty = !inputValue.trim();
 
   // Auto-resize textarea based on content
   useEffect(() => {
@@ -69,10 +71,32 @@ export default function ChatInput({
             rows={1}
             style={{ maxHeight: '200px', overflowY: 'auto' }}
           />
-          {isLoading && (
-            <div className="absolute right-3 bottom-3 flex items-center">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"></div>
+          {isLoading ? (
+            <div className="p-2">
+              <LoadingStates type="typing" text="Generating response..." />
             </div>
+          ) : (
+            <button
+              type="submit"
+              disabled={isInputEmpty || isLoading}
+              className={`p-2 rounded-full ${
+                isInputEmpty ? 'text-gray-400' : 'text-blue-600 hover:text-blue-800'
+              }`}
+              aria-label="Send message"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
           )}
         </div>
         <button

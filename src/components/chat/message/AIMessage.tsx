@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { RetrievedContext } from '@/types/chat';
 import { ContextDisplay } from '../context/ContextDisplay';
+import LoadingStates from '../LoadingStates';
 
 interface AIMessageProps {
   message: string;
@@ -43,7 +44,7 @@ export const AIMessage: React.FC<AIMessageProps> = ({
         <div className="flex-1 bg-white rounded-lg border border-gray-200 px-4 py-3 shadow-sm">
           {isLoading ? (
             <div className="flex items-center">
-              <div className="dot-typing"></div>
+              <LoadingStates type="typing" />
             </div>
           ) : (
             <>

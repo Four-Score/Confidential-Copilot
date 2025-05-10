@@ -288,25 +288,27 @@ export const DataSelectionModal: React.FC = () => {
         </div>
         
         {/* Action buttons - fixed at bottom */}
-        <div className="flex justify-end p-6 space-x-3 border-t border-gray-200 mt-4">
-          <Button 
-            variant="outline" 
-            onClick={goBack}
-            className="px-4 py-2"
-          >
-          {modalProps.destination === 'chat' && hasSelectedDocuments() && (
-            <Button
-              onClick={() => {
-                closeModal();
-                router.push('/dashboard/chat');
-              }}
-              className="ml-auto"
+          <div className="flex justify-end p-6 space-x-3 border-t border-gray-200 mt-4">
+            <Button 
+              variant="outline" 
+              onClick={goBack}
+              className="px-4 py-2"
             >
-              Continue to Chat
+              Back
             </Button>
-          )}
-            </Button>
-        </div>
+
+            {modalProps.destination === 'chat' && hasSelectedDocuments() && (
+              <Button
+                onClick={() => {
+                  closeModal();
+                  router.push('/dashboard/chat');
+                }}
+                className="ml-2"
+              >
+                Continue to Chat
+              </Button>
+            )}
+          </div>
       </div>
       </ModalTransition>
     </Modal>

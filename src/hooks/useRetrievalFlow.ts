@@ -40,19 +40,16 @@ export const useRetrievalFlow = () => {
  * Start retrieval flow specifically for chat mode
  * @param keepExistingDocs Whether to keep existing document selections
  */
-const startRetrievalForChat = (keepExistingDocs: boolean = false) => {
-  // If we want to clear existing selections before starting
-  if (!keepExistingDocs) {
-    clearProjectSelection();
+const startRetrievalForChat = (clearExisting = false) => {
+  if (clearExisting) {
     clearDocumentSelection();
   }
   
-  // Open project selection modal with chat destination
   openModal(MODAL_ROUTES.PROJECT_SELECTION, { 
     currentView: MODAL_ROUTES.PROJECT_SELECTION,
-    destination: 'chat',
-    title: 'Select Projects for Chat',
-    description: 'Choose projects containing documents you want to chat with'
+    title: "Select Project for Chat",
+    description: "Choose a project to search for relevant documents to use in your chat",
+    destination: 'chat' // This is the critical parameter
   });
 };
 
