@@ -4,10 +4,14 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/Button';
+import { ModesContainer } from '@/components/dashboard/ModesContainer';
+import { useModal } from '@/contexts/ModalContext';
+import { MODAL_ROUTES } from '@/constants/modalRoutes';
 
 export default function DashboardPage() {
     const router = useRouter();
     const { user } = useAuthStore();
+    const { openModal } = useModal();
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
     // Navigate to the meeting summarizer page
@@ -18,6 +22,35 @@ export default function DashboardPage() {
     // Navigate to projects page
     const navigateToProjects = () => {
         router.push('/projects');
+    };
+
+    // Define modes data for the cards
+    const modes = [
+        {
+            icon: '💬',
+            title: 'Chat Mode',
+            description: 'Interact with your documents through conversational AI'
+        },
+        {
+            icon: '✉️',
+            title: 'Email Mode',
+            description: 'Generate and analyze emails with AI assistance'
+        },
+        {
+            icon: '🗣️',
+            title: 'Meeting Mode',
+            description: 'Summarize and extract insights from meeting transcripts'
+        },
+        {
+            icon: '📄',
+            title: 'Document Mode',
+            description: 'Process and interact with your document collection'
+        }
+    ];
+
+    // Retrieval button click handler - will be implemented later
+    const handleRetrievalClick = () => {
+        openModal(MODAL_ROUTES.PROJECT_SELECTION, { currentView: MODAL_ROUTES.PROJECT_SELECTION });
     };
 
     return (
@@ -161,62 +194,21 @@ export default function DashboardPage() {
                         </div>
                     </div>
 
-                    {/* Content Sections */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        {/* Most Recently Used */}
-                        <div className="bg-white p-5 rounded-md shadow-sm border border-gray-100">
-                            <h3 className="font-bold text-sm mb-4 border-b pb-2">MOST RECENTLY USED</h3>
-                            <ul className="space-y-2">
-                                <li className="flex items-center text-sm">
-                                    <span className="mr-2">•</span>
-                                    Reply to HR department
-                                </li>
-                                <li className="flex items-center text-sm">
-                                    <span className="mr-2">•</span>
-                                    A road map for AI project
-                                </li>
-                                <li className="flex items-center text-sm">
-                                    <span className="mr-2">•</span>
-                                    Tips for presentation
-                                </li>
-                                <li className="flex items-center text-sm">
-                                    <span className="mr-2">•</span>
-                                    Gradle build error fix
-                                </li>
-                            </ul>
-                        </div>
-
-                        {/* Ingest Data */}
-                        <div className="bg-white p-5 rounded-md shadow-sm border border-gray-100">
-                            <div className="flex justify-between items-center mb-4 border-b pb-2">
-                                <h3 className="font-bold text-sm">INGEST DATA</h3>
-                                <Button variant="outline" size="sm">
-                                    📤
-                                </Button>
-                            </div>
-                            <div className="space-y-3">
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        placeholder="paste the URL here"
-                                        className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm"
-                                    />
-                                    <div className="absolute right-3 top-2 text-gray-400">📥</div>
-                                </div>
-                                <div className="relative">
-                                    <Button variant="outline" className="w-full justify-between text-gray-500 text-sm">
-                                        Inject email Data
-                                        <span>📥</span>
-                                    </Button>
-                                </div>
-                                <div className="relative">
-                                    <Button variant="outline" className="w-full justify-between text-gray-500 text-sm">
-                                        connect google drive
-                                        <span>📥</span>
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
+                    {/* Replace Content Sections with ModesContainer */}
+                    <div className="mb-8">
+                        <ModesContainer modes={modes} />
+                    </div>
+                    
+                    {/* Retrieval Button - Small and unobtrusive in the corner */}
+                    <div className="flex justify-end mt-4">
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-xs bg-gray-50 border-gray-300 text-gray-600 hover:bg-gray-100"
+                            onClick={handleRetrievalClick}
+                        >
+                            Retrieval
+                        </Button>
                     </div>
                 </main>
             </div>

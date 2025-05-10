@@ -1,11 +1,18 @@
 import { keyManagementService } from './KeyManagementService';
 import { useAuthStore } from '@/store/authStore';
+import { ensureKeyManagementInitialized } from './promptUtils';
+
 
 /**
  * Initialize the key management service with the current user and symmetric key
  */
 async function ensureInitialized(symmetricKey?: CryptoKey): Promise<boolean> {
+  
   try {
+
+    if (keyManagementService.isInitialized()) {
+      return true;
+    }
     // Get user and symmetric key from auth store if not provided
     const user = useAuthStore.getState().user;
     const key = symmetricKey || useAuthStore.getState().decryptedSymmetricKey;

@@ -15,6 +15,7 @@ import { useDocumentProcessor } from '@/hooks/useDocumentProcessor';
 import YoutubePreview from '@/components/youtube/YoutubePreview';
 import { processYoutubeTranscript } from '@/lib/clientProcessing';
 
+
 export default function ProjectPage() {
   const params = useParams();
   const projectId = params.id as string;
@@ -38,8 +39,12 @@ export default function ProjectPage() {
   const [isYoutubeIngesting, setIsYoutubeIngesting] = useState(false);
   const [youtubeDocs, setYoutubeDocs] = useState<UnencryptedDocument[]>([]);
   // Get encryption service
-  const { service: encryptionService, isLoading: isEncryptionLoading } = useKeyManagement();
-  
+  const { 
+    service: encryptionService, 
+    isLoading: isEncryptionLoading,
+    ensureInitialized 
+  } = useKeyManagement();
+
   // Get document processor
   const { 
     processFile, 
@@ -81,12 +86,29 @@ export default function ProjectPage() {
         // Decrypt document names if encryption service is available
         let decryptedDocuments = documentsData;
         
-        if (encryptionService && Array.isArray(documentsData)) {
-          decryptedDocuments = documentsData.map(doc => ({
-            ...doc,
-            name: encryptionService.decryptMetadata(doc.name)
-          }));
+        try {
+          if (encryptionService && Array.isArray(documentsData)) {
+            // Make sure KMS is initialized
+            await ensureInitialized();
+            
+            // Now process all documents
+            decryptedDocuments = await Promise.all(documentsData.map(async (doc) => {
+              try {
+                const decryptedName = await encryptionService.decryptMetadata(doc.name);
+                return {
+                  ...doc,
+                  name: decryptedName || doc.name
+                };
+              } catch (error) {
+                console.error('Failed to decrypt document name:', error);
+                return doc;
+              }
+            }));
+          }
+        } catch (error) {
+          console.error('Error during document name decryption:', error);
         }
+
         
         setDocuments(Array.isArray(decryptedDocuments) ? decryptedDocuments : []);
         
@@ -128,13 +150,19 @@ export default function ProjectPage() {
   }, [projectId, encryptionService]);
 
   // Handle document upload completion
-  const handleDocumentUpload = (newDocument: Document) => {
+  const handleDocumentUpload = async (newDocument: Document) => {
     // Decrypt the new document's name if encryption service is available
     if (encryptionService) {
-      newDocument = {
-        ...newDocument,
-        name: encryptionService.decryptMetadata(newDocument.name)
-      };
+      try {
+        await ensureInitialized();
+        const decryptedName = await encryptionService.decryptMetadata(newDocument.name);
+        newDocument = {
+          ...newDocument,
+          name: decryptedName || newDocument.name
+        };
+      } catch (error) {
+        console.error('Error decrypting document name:', error);
+      }
     }
     setUploadedDocument(newDocument);
     setUploadSuccess(true);
