@@ -29,7 +29,8 @@ export default function DashboardPage() {
         {
             icon: '💬',
             title: 'Chat Mode',
-            description: 'Interact with your documents through conversational AI'
+            description: 'Interact with your documents through conversational AI',
+            onClick: () => startRetrievalForChat()
         },
         {
             icon: '✉️',
@@ -51,6 +52,15 @@ export default function DashboardPage() {
     // Retrieval button click handler - will be implemented later
     const handleRetrievalClick = () => {
         openModal(MODAL_ROUTES.PROJECT_SELECTION, { currentView: MODAL_ROUTES.PROJECT_SELECTION });
+    };
+
+    const startRetrievalForChat = () => {
+        openModal(MODAL_ROUTES.PROJECT_SELECTION, { 
+            currentView: MODAL_ROUTES.PROJECT_SELECTION,
+            destination: 'chat',
+            title: 'Select Projects for Chat',
+            description: 'Choose projects containing documents you want to chat with'
+        });
     };
 
     return (

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Modal } from '@/components/ui/Modal';
 import { ModalTransition } from '@/components/ui/ModalTransition';
 import { useModal } from '@/contexts/ModalContext';
@@ -34,9 +35,9 @@ interface WebsiteResponse {
     metadata?: any;
   }>;
 }
-
 export const DataSelectionModal: React.FC = () => {
   // Hooks
+  const router = useRouter();
   const { isModalOpen, closeModal, openModal, goBack, modalProps } = useModal();
   const { 
     selectedProjectId, 
@@ -293,15 +294,18 @@ export const DataSelectionModal: React.FC = () => {
             onClick={goBack}
             className="px-4 py-2"
           >
-            Back
-          </Button>
-          <Button 
-            disabled={!hasSelectedDocuments()}
-            onClick={handleProceed}
-            className={`px-6 py-2 ${!hasSelectedDocuments() ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            Search Selected Documents
-          </Button>
+          {modalProps.destination === 'chat' && hasSelectedDocuments() && (
+            <Button
+              onClick={() => {
+                closeModal();
+                router.push('/dashboard/chat');
+              }}
+              className="ml-auto"
+            >
+              Continue to Chat
+            </Button>
+          )}
+            </Button>
         </div>
       </div>
       </ModalTransition>

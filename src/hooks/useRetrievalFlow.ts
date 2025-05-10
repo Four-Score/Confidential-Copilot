@@ -1,6 +1,7 @@
 'use client';
 
 import { useModal } from '@/contexts/ModalContext';
+import { useRouter } from 'next/navigation';
 import { useDataSelection } from '@/contexts/DataSelectionContext';
 import { useSearch } from '@/contexts/SearchContext';
 import { MODAL_ROUTES } from '@/constants/modalRoutes';
@@ -10,7 +11,8 @@ import { SelectedDocument } from '@/contexts/DataSelectionContext';
  * Hook providing utility functions for the retrieval flow
  */
 export const useRetrievalFlow = () => {
-  const { openModal } = useModal();
+  const { openModal, closeModal } = useModal();
+  const router = useRouter();
   const { 
     selectedProjectId,
     selectedProjectName,
@@ -33,6 +35,44 @@ export const useRetrievalFlow = () => {
   const startRetrievalFlow = () => {
     openModal(MODAL_ROUTES.PROJECT_SELECTION, { currentView: MODAL_ROUTES.PROJECT_SELECTION });
   };
+
+  /**
+ * Start retrieval flow specifically for chat mode
+ * @param keepExistingDocs Whether to keep existing document selections
+ */
+const startRetrievalForChat = (keepExistingDocs: boolean = false) => {
+  // If we want to clear existing selections before starting
+  if (!keepExistingDocs) {
+    clearProjectSelection();
+    clearDocumentSelection();
+  }
+  
+  // Open project selection modal with chat destination
+  openModal(MODAL_ROUTES.PROJECT_SELECTION, { 
+    currentView: MODAL_ROUTES.PROJECT_SELECTION,
+    destination: 'chat',
+    title: 'Select Projects for Chat',
+    description: 'Choose projects containing documents you want to chat with'
+  });
+};
+
+// Make sure the completeRetrieval function properly handles chat destination:
+const completeRetrieval = (destination?: string) => {
+  // If destination is chat, initialize chat with selected documents
+  if (destination === 'chat') {
+    closeModal(); // Close the modal before navigating
+    router.push('/dashboard/chat');
+    return;
+  }
+  
+  // Default behavior for search
+  if (selectedProjectId) {
+    openModal(MODAL_ROUTES.SEARCH_INTERFACE, {
+      currentView: MODAL_ROUTES.SEARCH_INTERFACE,
+      previousView: MODAL_ROUTES.DATA_SELECTION,
+    });
+  }
+};
   
   /**
    * Skip directly to document selection for a specific project
@@ -127,6 +167,8 @@ export const useRetrievalFlow = () => {
       error: useSearch().error
     };
   };
+
+  
   
   return {
     startRetrievalFlow,
@@ -136,6 +178,8 @@ export const useRetrievalFlow = () => {
     getRetrievalState,
     executeSearchWithCurrentSelections,
     clearSearchResults,
-    getSearchResults
+    getSearchResults,
+    completeRetrieval,
+    startRetrievalForChat
   };
 };
