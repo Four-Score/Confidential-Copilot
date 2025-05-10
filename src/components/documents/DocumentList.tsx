@@ -2,17 +2,20 @@ import { useState } from 'react';
 import { Document, UnencryptedDocument, isUnencryptedDocument } from '@/types/document';
 import DocumentCard from './DocumentCard';
 import WebsiteCard from '../websites/WebsiteCard';
+import YoutubeCard from '../youtube/YoutubeCard';
 
 interface DocumentListProps {
   documents: (Document | UnencryptedDocument)[];
   onDelete: (documentId: string) => Promise<{ success: boolean; error?: string }>;
   onWebsiteDelete?: (websiteId: string) => Promise<{ success: boolean; error?: string }>;
+  onYoutubeDelete?: (youtubeId: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 export default function DocumentList({ 
   documents, 
   onDelete,
-  onWebsiteDelete
+  onWebsiteDelete,
+  onYoutubeDelete
 }: DocumentListProps) {
   const [sortBy, setSortBy] = useState<'name' | 'upload_date'>('upload_date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -140,21 +143,33 @@ export default function DocumentList({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredAndSortedDocuments.map(document => (
-            isUnencryptedDocument(document) ? (
-              <WebsiteCard 
-                key={document.id} 
-                website={document} 
-                onDelete={handleWebsiteDelete} 
-              />
-            ) : (
-              <DocumentCard 
-                key={document.id} 
-                document={document as Document} 
-                onDelete={onDelete} 
-              />
-            )
-          ))}
+          {filteredAndSortedDocuments.map(document => {
+            if (isUnencryptedDocument(document) && document.type === 'website') {
+              return (
+                <WebsiteCard
+                  key={document.id}
+                  website={document}
+                  onDelete={handleWebsiteDelete}
+                />
+              );
+            } else if (isUnencryptedDocument(document) && document.type === 'youtube') {
+              return (
+                <YoutubeCard
+                  key={document.id}
+                  document={document}
+                  onDelete={onYoutubeDelete ? onYoutubeDelete : onDelete}
+                />
+              );
+            } else {
+              return (
+                <DocumentCard
+                  key={document.id}
+                  document={document as Document}
+                  onDelete={onDelete}
+                />
+              );
+            }
+          })}
         </div>
       )}
     </div>

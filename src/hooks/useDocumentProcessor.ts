@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { ProcessingProgressEvent } from '@/lib/processingUtils';
 import { processDocument, processWebsite, DocumentProcessingOptions, ProcessingResult, WebsiteProcessingOptions, WebsiteProcessingResult } from '@/lib/clientProcessing';
-
+import { processYoutubeTranscript, YoutubeProcessingOptions, YoutubeProcessingResult } from '@/lib/clientProcessing';
 /**
  * Hook for document processing operations
  */
@@ -127,15 +127,69 @@ export function useDocumentProcessor() {
     },
     [] // No dependencies since we don't need symmetricKey for websites
   );
-  
+
+  const processYoutubeTranscriptHandler = useCallback(
+    async (
+      projectId: string,
+      transcript: string,
+      videoId: string,
+      videoUrl: string,
+      title?: string,
+      options?: YoutubeProcessingOptions
+    ): Promise<YoutubeProcessingResult> => {
+      setIsProcessing(true);
+      setProgress(0);
+      setStatus('Initializing YouTube processing');
+      setError(null);
+
+      try {
+        const enhancedOptions: YoutubeProcessingOptions = {
+          ...options,
+          onProgress: (event: ProcessingProgressEvent) => {
+            setProgress(event.progress);
+            setStatus(event.currentStep || null);
+            options?.onProgress?.(event);
+          }
+        };
+
+        const result = await processYoutubeTranscript(
+          projectId,
+          transcript,
+          videoId,
+          videoUrl,
+          title,
+          enhancedOptions
+        );
+
+        if (!result.success) {
+          setError(result.error || 'YouTube processing failed');
+        }
+
+        return result;
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        setError(errorMessage);
+
+        return {
+          youtubeId: '',
+          success: false,
+          error: errorMessage
+        };
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    []
+  );
+
   return {
     processFile,
-    processWebsiteUrl, 
+    processWebsiteUrl,
+    processYoutubeTranscript: processYoutubeTranscriptHandler,
     isProcessing,
     progress,
     status,
     error,
-    // Helper to reset state (useful when component unmounts or user starts a new upload)
     reset: useCallback(() => {
       setIsProcessing(false);
       setProgress(0);
