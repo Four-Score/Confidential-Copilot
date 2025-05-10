@@ -25,28 +25,29 @@ export default function DashboardPage() {
     };
 
     // Define modes data for the cards
-    const modes = [
-        {
-            icon: '💬',
-            title: 'Chat Mode',
-            description: 'Interact with your documents through conversational AI'
-        },
-        {
-            icon: '✉️',
-            title: 'Email Mode',
-            description: 'Generate and analyze emails with AI assistance'
-        },
-        {
-            icon: '🗣️',
-            title: 'Meeting Mode',
-            description: 'Summarize and extract insights from meeting transcripts'
-        },
-        {
-            icon: '📄',
-            title: 'Document Mode',
-            description: 'Process and interact with your document collection'
-        }
-    ];
+      const modes = [
+  {
+    icon: '💬',
+    title: 'Chat Mode',
+    description: 'Interact with your documents through conversational AI'
+  },
+  {
+    icon: '✉️',
+    title: 'Email Mode',
+    description: 'Generate and analyze emails with AI assistance',
+    onClick: () => router.push('/dashboard/email-ingestor') // no .tsx in routes
+  },
+  {
+    icon: '🗣️',
+    title: 'Meeting Mode',
+    description: 'Summarize and extract insights from meeting transcripts'
+  },
+  {
+    icon: '📄',
+    title: 'Document Mode',
+    description: 'Process and interact with your document collection'
+  }
+];
 
     // Retrieval button click handler - will be implemented later
     const handleRetrievalClick = () => {
