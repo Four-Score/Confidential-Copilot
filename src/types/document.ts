@@ -76,7 +76,6 @@ export interface YoutubeChunkMetadata {
   endPosition: number;
   [key: string]: any;
 }
-=======
 // Search result for a document
 export interface DocumentWithSimilarity extends Document {
   similarity?: number;
