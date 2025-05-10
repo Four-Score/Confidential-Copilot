@@ -2,7 +2,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import UserMessage from './UserMessage';
-import AIMessage from './AIMessage';
+import { AIMessage } from './AIMessage';
 import { ChatMessage } from '@/types/chat';
 import { RetrievedContext } from '@/types/chat';
 
@@ -71,9 +71,9 @@ export default function MessageList({
             <AIMessage 
               key={msg.id} 
               message={msg.content}
-              timestamp={msg.timestamp}
+              timestamp={msg.timestamp.toString()}
               // Only pass context to the last AI message
-              context={isLastAiMessage ? currentContext : null}
+              context={isLastAiMessage && currentContext ? currentContext : undefined}
             />
           );
         }
