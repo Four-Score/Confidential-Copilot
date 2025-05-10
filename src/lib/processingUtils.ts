@@ -87,7 +87,7 @@ export async function updateProcessingProgress(
   progress: number,
   status: string,
   currentStep?: string,
-  contentType: 'document' | 'website' = 'document'
+  contentType: 'document' | 'website' | 'youtube' = 'document'
 ): Promise<void> {
   const response = await fetch('/api/documents/progress', {
     method: 'POST',

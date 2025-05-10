@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Document } from '@/types/document';
 
+
 interface DocumentCardProps {
   document: Document;
   onDelete: (documentId: string) => Promise<{ success: boolean; error?: string }>;

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { keyManagementService } from './KeyManagementService';
+import { ensureKeyManagementInitialized } from './promptUtils';
+
 
 interface KeyManagementState {
   isInitialized: boolean;
@@ -22,6 +24,64 @@ export function useKeyManagement() {
   const symmetricKey = useAuthStore((state) => state.decryptedSymmetricKey);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated());
   
+  useEffect(() => {
+    // Update the checkSession function in the useEffect:
+
+  const checkSession = async () => {
+    // Skip if already initialized or not authenticated
+    if (state.isInitialized || !isAuthenticated || !user) {
+      return;
+    }
+    
+    // If we have a symmetric key but service isn't initialized,
+    // try to initialize from the key we have
+    if (symmetricKey && !state.isInitialized) {
+      setState(prev => ({ ...prev, isLoading: true }));
+      try {
+        const success = await keyManagementService.initialize(user.id, symmetricKey);
+        setState({
+          isInitialized: success,
+          isLoading: false,
+          error: success ? null : 'Failed to initialize key management service'
+        });
+      } catch (error) {
+        console.error('Error initializing key management service from hook:', error);
+        setState({
+          isInitialized: false,
+          isLoading: false,
+          error: `Initialization error: ${error instanceof Error ? error.message : String(error)}`
+        });
+      }
+      return;
+    }
+    
+    // If no key in memory but we're authenticated, try recovery options
+    if (!symmetricKey && isAuthenticated) {
+      setState(prev => ({ ...prev, isLoading: true }));
+      try {
+        // First check session storage
+        let success = await useAuthStore.getState().checkSessionStorage();
+        
+        // If that fails, try to recover from session (new tab case)
+        if (!success) {
+          console.log("Session storage check failed, trying session recovery");
+          success = await useAuthStore.getState().recoverKeyFromSession();
+        }
+        
+        if (!success) {
+          setState(prev => ({ ...prev, isLoading: false }));
+          console.log("All key recovery methods failed");
+        }
+      } catch (error) {
+        console.error('Error during key recovery:', error);
+        setState(prev => ({ ...prev, isLoading: false }));
+      }
+    }
+  };
+    
+  checkSession();
+  }, [isAuthenticated, user, symmetricKey, state.isInitialized]);
+
   useEffect(() => {
     let isMounted = true;
     
@@ -83,48 +143,65 @@ export function useKeyManagement() {
     }
   }, [isAuthenticated]);
   
+  // Function to ensure KMS is initialized
+  const ensureInitialized = async () => {
+    if (!state.isInitialized) {
+      const success = await ensureKeyManagementInitialized();
+      if (success) {
+        setState({
+          isInitialized: true,
+          isLoading: false,
+          error: null
+        });
+      }
+      return success;
+    }
+    return true;
+  };
+  
   return {
     ...state,
     service: keyManagementService,
+    ensureInitialized,
     
     // Helper functions for convenience
-    encryptText: (text: string) => {
-      if (!state.isInitialized) {
+    encryptText: async (text: string) => {
+      if (!(await ensureInitialized())) {
         throw new Error('Key management service not initialized');
       }
       return keyManagementService.encryptText(text);
     },
     
-    decryptText: (encryptedText: string) => {
-      if (!state.isInitialized) {
+    decryptText: async (encryptedText: string) => {
+      if (!(await ensureInitialized())) {
         throw new Error('Key management service not initialized');
       }
       return keyManagementService.decryptText(encryptedText);
     },
     
-    encryptMetadata: (metadata: string) => {
-      if (!state.isInitialized) {
+    encryptMetadata: async (metadata: any) => {
+      if (!(await ensureInitialized())) {
         throw new Error('Key management service not initialized');
       }
       return keyManagementService.encryptMetadata(metadata);
     },
     
-    decryptMetadata: (encryptedMetadata: any) => {
-      if (!state.isInitialized) {
+    decryptMetadata: async (encryptedMetadata: any) => {
+      if (!(await ensureInitialized())) {
         throw new Error('Key management service not initialized');
       }
       return keyManagementService.decryptMetadata(encryptedMetadata);
     },
     
-    encryptVector: (vector: number[]) => {
-      if (!state.isInitialized) {
+    encryptVector: async (vector: number[]) => {
+      if (!(await ensureInitialized())) {
         throw new Error('Key management service not initialized');
       }
       return keyManagementService.encryptVector(vector);
     },
     
-    decryptVector: (encryptedVector: number[]) => {
-      if (!state.isInitialized) {
+    decryptVector: async (encryptedVector: number[]) => {
+      if (!(await ensureInitialized())) {
         throw new Error('Key management service not initialized');
       }
       return keyManagementService.decryptVector(encryptedVector);

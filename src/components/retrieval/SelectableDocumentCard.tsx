@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { keyManagementService } from '@/services/keyManagement';
+import { useModalContext } from '@/contexts/PasswordModalContext';
 import { useDataSelection } from '@/contexts/DataSelectionContext';
-
+ 
 // Define type for document source
 type DocumentSource = 'encrypted' | 'unencrypted';
 
@@ -16,6 +17,7 @@ interface DocumentData {
   page_count?: number;
   encryptedName?: boolean;
   url?: string; // Add URL field for website documents
+  metadata?: any; // Add metadata field for YouTube documents
 }
 
 interface SelectableDocumentCardProps {
@@ -24,11 +26,24 @@ interface SelectableDocumentCardProps {
   onSelect?: (id: string, selected: boolean) => void;
 }
 
+// Add helper for YouTube thumbnail
+const getYoutubeThumbnail = (url?: string, metadata?: any): string | null => {
+  // Try to extract videoId from url or metadata
+  let videoId = '';
+  if (metadata && metadata.videoId) videoId = metadata.videoId;
+  else if (url) {
+    const match = url.match(/(?:v=|\/embed\/|\.be\/)([a-zA-Z0-9_-]{11})/);
+    if (match) videoId = match[1];
+  }
+  return videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null;
+};
+
 export const SelectableDocumentCard: React.FC<SelectableDocumentCardProps> = ({
   document,
   source,
   onSelect
 }) => {
+  const { showPasswordPrompt } = useModalContext();
   const { isDocumentSelected, toggleDocument } = useDataSelection();
   const [displayName, setDisplayName] = useState<string>(document.name);
   const [isSelected, setIsSelected] = useState<boolean>(isDocumentSelected(document.id));
@@ -68,9 +83,15 @@ export const SelectableDocumentCard: React.FC<SelectableDocumentCardProps> = ({
   const getDocumentIcon = () => {
     if (document.type === 'pdf') return '📄';
     if (document.type === 'website') {
-      // If we have a favicon, return null since we'll use the img tag
       if (favicon && !faviconError) return null;
       return '🌐';
+    }
+    if (document.type === 'youtube') {
+      return (
+        <svg className="w-8 h-8 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M21.8 8.001a2.75 2.75 0 0 0-1.94-1.94C18.13 6 12 6 12 6s-6.13 0-7.86.061A2.75 2.75 0 0 0 2.2 8.001C2 9.74 2 12 2 12s0 2.26.2 3.999a2.75 2.75 0 0 0 1.94 1.94C5.87 18 12 18 12 18s6.13 0 7.86-.061a2.75 2.75 0 0 0 1.94-1.94C22 14.26 22 12 22 12s0-2.26-.2-3.999zM10 15.5v-7l6 3.5-6 3.5z"/>
+        </svg>
+      );
     }
     return '📄';
   };
@@ -110,10 +131,9 @@ export const SelectableDocumentCard: React.FC<SelectableDocumentCardProps> = ({
     const decryptDocumentName = async () => {
       if (source === 'encrypted' && document.encryptedName) {
         try {
-          // Use decryptMetadata instead of decryptText for document names
-          // Document names are encrypted using encryptMetadata, not encryptText
           if (!keyManagementService.isInitialized()) {
-            console.log("Key Management Service not initialized yet, skipping decryption");
+            console.log("Key Management Service not initialized yet, triggering password prompt");
+            showPasswordPrompt(); // Show password prompt when keys aren't available
             setDisplayName(document.name || 'Encrypted Document');
             return;
           }
@@ -126,9 +146,9 @@ export const SelectableDocumentCard: React.FC<SelectableDocumentCardProps> = ({
         }
       }
     };
-
+  
     decryptDocumentName();
-  }, [document.name, document.encryptedName, source]);
+  }, [document.name, document.encryptedName, source, showPasswordPrompt]);
 
   // Effect to sync selection state with context
   useEffect(() => {
@@ -159,27 +179,53 @@ export const SelectableDocumentCard: React.FC<SelectableDocumentCardProps> = ({
       </div>
 
       <div className="flex items-start space-x-3 pr-8">
-        {/* Document icon */}
+        {/* Document icon or thumbnail */}
         <div className="text-2xl">
-          {getDocumentIcon() || (
-            favicon && !faviconError && (
+          {document.type === 'youtube' ? (
+            getYoutubeThumbnail(document.url, document.metadata) ? (
               <img
-                src={favicon}
-                alt="Favicon"
-                className="h-8 w-8"
-                onError={() => setFaviconError(true)}
+                src={getYoutubeThumbnail(document.url, document.metadata) as string}
+                alt="YouTube Thumbnail"
+                className="h-22 w-38 rounded"
+                style={{ objectFit: 'cover' }}
               />
+            ) : getDocumentIcon()
+          ) : (
+            getDocumentIcon() || (
+              favicon && !faviconError && (
+                <img
+                  src={favicon}
+                  alt="Favicon"
+                  className="h-8 w-8"
+                  onError={() => setFaviconError(true)}
+                />
+              )
             )
           )}
         </div>
         
         <div className="flex-1 min-w-0">
           {/* Document title */}
-          <h3 className="text-lg font-medium text-gray-900 truncate">{displayName}</h3>
+          <h3 className="text-lg font-medium text-gray-900 truncate">
+            {document.type === 'youtube' && document.url ? (
+              <a
+                href={document.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 underline"
+              >
+                View on YouTube
+              </a>
+            ) : (
+              displayName
+            )}
+          </h3>
           
           {/* Document metadata */}
           <div className="mt-1 flex flex-wrap text-sm text-gray-500">
-            <div className="mr-4">Type: {document.type.toUpperCase()}</div>
+            <div className="mr-4">
+              Type: {document.type === 'youtube' ? 'YOUTUBE' : document.type.toUpperCase()}
+            </div>
             
             {document.upload_date && (
               <div className="mr-4">Added: {formatDate(document.upload_date)}</div>
@@ -192,7 +238,7 @@ export const SelectableDocumentCard: React.FC<SelectableDocumentCardProps> = ({
             {document.page_count !== undefined && document.page_count > 0 && (
               <div>Pages: {document.page_count}</div>
             )}
-            
+
             {/* Source indicator */}
             <div className="mt-1 w-full">
               <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
