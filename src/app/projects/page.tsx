@@ -7,6 +7,7 @@ import ProjectList from '@/components/projects/ProjectList';
 import CreateProjectModal from '@/components/projects/CreateProjectModal';
 import EmptyState from '@/components/projects/EmptyState';
 import { Project } from '@/types/project';
+import { authFetch, authFetchJson } from '@/lib/authFetch';
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -23,21 +24,21 @@ export default function ProjectsPage() {
   // Fetch projects when component mounts
   useEffect(() => {
     if (!isAuthenticated) return;
-    
+      
     async function fetchProjects() {
       setIsLoading(true);
       setError(null);
       
       try {
-        const response = await fetch('/api/projects');
+        // Use authFetchJson instead of regular fetch
+        const data = await authFetchJson<Project[]>('/api/projects', {}, {
+          maxRetries: 5,
+          maxDelay: 500,
+          onRetry: (attempt, delay) => {
+            console.log(`Retrying projects fetch (attempt ${attempt}) in ${delay}ms...`);
+          }
+        });
         
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to fetch projects');
-        }
-        
-        const data = await response.json();
-        // Fix: API returns the projects array directly, not nested under a 'projects' property
         setProjects(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error('Error fetching projects:', err);
@@ -50,24 +51,14 @@ export default function ProjectsPage() {
     fetchProjects();
   }, [isAuthenticated]);
 
-  // Handle project creation
+  // Handle project creation - using authFetch instead of regular fetch
   const handleCreateProject = async (projectData: { name: string; description?: string }) => {
     try {
-      const response = await fetch('/api/projects', {
+      const newProject = await authFetchJson<Project>('/api/projects', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(projectData),
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create project');
-      }
-      
-      const newProject = await response.json();
-      // Fix: API returns the project directly, not nested under a 'project' property
       setProjects([newProject, ...projects]);
       setIsModalOpen(false);
     } catch (err) {
@@ -76,17 +67,12 @@ export default function ProjectsPage() {
     }
   };
 
-  // Handle project deletion
+  // Handle project deletion - using authFetch instead of regular fetch
   const handleDeleteProject = async (projectId: string) => {
     try {
-      const response = await fetch(`/api/projects/${projectId}`, {
+      await authFetch(`/api/projects/${projectId}`, {
         method: 'DELETE',
       });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete project');
-      }
       
       setProjects(projects.filter(project => project.id !== projectId));
     } catch (err) {

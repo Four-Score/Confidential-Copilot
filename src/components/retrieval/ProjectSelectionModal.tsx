@@ -9,11 +9,15 @@ import { SelectableProjectCard } from './SelectableProjectCard';
 import { Project } from '@/types/project';
 import { Button } from '@/components/ui/Button';
 import { MODAL_ROUTES } from '@/constants/modalRoutes';
+import { useAuthStore } from '@/store/authStore';
+import { authFetch, authFetchJson } from '@/lib/authFetch';
+import { createClient } from '@/lib/supabase/client';
 
 export const ProjectSelectionModal: React.FC = () => {
   // Context hooks
   const { isModalOpen, closeModal, openModal, modalProps } = useModal();
   const { selectProject } = useDataSelection();
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated());
   
   // Local state
   const [projects, setProjects] = useState<Project[]>([]);
@@ -22,24 +26,49 @@ export const ProjectSelectionModal: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [hasFetchedProjects, setHasFetchedProjects] = useState(false);
+  const [authInitialized, setAuthInitialized] = useState(false);
 
-  // Fetch projects when component mounts
+  useEffect(() => {
+  // Check if auth is initialized
+  const checkAuth = async () => {
+    const supabase = createClient();
+    try {
+      const { data } = await supabase.auth.getSession();
+      setAuthInitialized(!!data.session);
+    } catch (err) {
+      console.error("Error checking auth session:", err);
+    }
+  };
+  
+  if (isAuthenticated) {
+    checkAuth();
+  }
+}, [isAuthenticated]);
+  // Only fetch projects when modal is open AND user is authenticated
+  const shouldFetchProjects = 
+    isModalOpen && 
+    modalProps.currentView === MODAL_ROUTES.PROJECT_SELECTION && 
+    isAuthenticated && 
+    !hasFetchedProjects;
+
+  // Fetch projects when modal is opened and user is authenticated
   useEffect(() => {
     async function fetchProjects() {
+      if (!shouldFetchProjects) return;
+      
       setIsLoading(true);
       setError(null);
+      setHasFetchedProjects(true);
       
       try {
-        const response = await fetch('/api/projects');
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to fetch projects');
+        const data = await authFetchJson<Project[]>('/api/projects', {}, {
+        maxRetries: 5,
+        maxDelay: 500,
+        onRetry: (attempt, delay) => {
+          console.log(`Retrying projects fetch (attempt ${attempt}) in ${delay}ms...`);
         }
-        
-        const data = await response.json();
-        setProjects(Array.isArray(data) ? data : []);
-        setFilteredProjects(Array.isArray(data) ? data : []);
+      });
       } catch (err) {
         console.error('Error fetching projects:', err);
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
@@ -49,7 +78,15 @@ export const ProjectSelectionModal: React.FC = () => {
     }
     
     fetchProjects();
-  }, []);
+  }, [shouldFetchProjects, isAuthenticated, isModalOpen, modalProps.currentView]);
+
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!isModalOpen || modalProps.currentView !== MODAL_ROUTES.PROJECT_SELECTION) {
+      setHasFetchedProjects(false);
+      setSelectedProjectId(null);
+    }
+  }, [isModalOpen, modalProps.currentView]);
 
   // Filter projects when search query changes
   useEffect(() => {

@@ -87,7 +87,14 @@ export default function DashboardPage() {
                             <span className="text-sm">MK</span>
                         </div>
                     </div>
-                    <Button variant="secondary" size="sm" onClick={() => router.push('/log-out')}>
+                    <Button 
+                        variant="secondary" 
+                        size="sm" 
+                        onClick={async () => {
+                            await useAuthStore.getState().logout();
+                            router.push('/');  // Redirect to homepage after logout
+                        }}
+                    >
                         LOG OUT
                     </Button>
                 </div>

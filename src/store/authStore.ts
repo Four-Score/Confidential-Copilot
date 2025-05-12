@@ -187,107 +187,106 @@ export const useAuthStore = create<AuthState>((set, get) => ({
      * This function is called once when the app loads.
      */
     initializeAuth: async () => {
-        set({ isLoading: true });
-        const supabase = createClient(); // Browser client
+  set({ isLoading: true });
+  const supabase = createClient(); // Browser client
 
-        try {
-            // Get existing session
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-            
-            if (sessionError) {
-                if (sessionError.message?.includes("Auth session missing") || 
-                   sessionError.message?.includes("Refresh Token Not Found") ||
-                   sessionError.name === "AuthSessionMissingError") {
-                    console.log("No active session found - user not logged in");
-                    set({ user: null, session: null, isLoading: false, error: null });
-                    return;
-                }
-                
-                console.error("Error fetching auth session:", sessionError);
-                set({ user: null, session: null, isLoading: false, error: "Failed to initialize session." });
-                return;
-            }
-
-            if (session) {
-                // Set user and session from existing session
-                set({ 
-                    user: session.user,
-                    session: session
-                });
-
-                try {
-                    // Check session storage for symmetric key
-                    console.log("Checking session storage for symmetric key");
-                    const sessionKey = await getSymmetricKeyFromSession();
-                    if (sessionKey) {
-                        console.log('Found symmetric key in session storage');
-                        set({ decryptedSymmetricKey: sessionKey });
-                        
-                        // Initialize key management service with session key
-                        try {
-                            await keyManagementService.initialize(session.user.id, sessionKey);
-                            console.log("Key management service initialized from session storage");
-                        } catch (initError) {
-                            console.error("Failed to initialize key management service from session:", initError);
-                        }
-                    } else {
-                        console.log("No symmetric key found in session storage");
-                        // Continue without key - user will need to log in again
-                    }
-                } catch (sessionStorageError) {
-                    console.error("Failed to check session storage:", sessionStorageError);
-                }
-                
-                try {
-                    // Attempt to load the user's encryption keys if session exists
-                    const userId = session.user.id;
-                    const keyData = await userDbService.fetchUserKeys(userId);
-                    
-                    if (keyData) {
-                        console.log('Found existing user keys, session restored');
-                        // Note: For security, we're not automatically loading the symmetric key
-                        // The user will need to log in again to decrypt the key
-                    } else {
-                        console.log("No user key data found.");
-                    }
-                } catch (error) {
-                    console.error('Error loading keys for existing session:', error);
-                    // Continue with authenticated session but without keys loaded
-                }
-            } else {
-                set({ user: null, session: null });
-                console.log("No active session found.");
-            }
-            
-            // Set up the auth state change listener
-            const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
-                console.log("Auth state changed:", event);
-                if (currentSession) {
-                    set({ user: currentSession.user, session: currentSession });
-                } else {
-                    // Clear auth state and decrypted key when session is lost
-                    set({ user: null, session: null, decryptedSymmetricKey: null });
-                }
-            });
-            
-            set({ isLoading: false });
-        } catch (error: any) {
-            if (error.message?.includes("Auth session missing") || 
-                error.name === "AuthSessionMissingError") {
-                console.log("No active session found - user not logged in");
-                set({ user: null, session: null, isLoading: false, error: null });
-                return;
-            }
-            
-            console.error("Error initializing auth:", error);
-            set({ 
-                user: null, 
-                session: null, 
-                isLoading: false, 
-                error: error instanceof Error ? error.message : "Failed to initialize session." 
-            });
+  try {
+    console.log("Auth initialization started");
+    
+    // First check for an existing session - implemented with better error handling
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        if (error.message?.includes("Auth session missing") || 
+            error.message?.includes("Refresh Token Not Found") ||
+            error.name === "AuthSessionMissingError") {
+          console.log("No active session found - user not logged in");
+          set({ user: null, session: null, isLoading: false, error: null });
+          return;
         }
-    },
+        
+        throw error; // Let the outer catch handle other errors
+      }
+      
+      // If we have a session, update the auth state
+      if (data.session) {
+        console.log("Found active session, user ID:", data.session.user.id);
+        set({ 
+          user: data.session.user,
+          session: data.session,
+          isLoading: false
+        });
+        
+        // Try to restore key from session storage
+        await getSymmetricKeyFromSession()
+          .then(sessionKey => {
+            if (sessionKey) {
+              console.log("Successfully restored key from session storage");
+              set({ decryptedSymmetricKey: sessionKey });
+              
+              // Initialize key management
+              return keyManagementService.initialize(data.session.user.id, sessionKey)
+                .then(success => {
+                  console.log("Key management initialization:", success ? "successful" : "failed");
+                });
+            } else {
+              console.log("No symmetric key found in session storage");
+            }
+          })
+          .catch(err => {
+            console.error("Error retrieving session key:", err);
+          });
+          
+      } else {
+        console.log("No active session found");
+        set({ user: null, session: null, isLoading: false });
+      }
+    } catch (error) {
+      console.error("Error during session check:", error);
+      throw error; // Propagate to outer catch
+    }
+    
+    // Set up the auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
+      console.log("Auth state changed:", event);
+      if (currentSession) {
+        console.log("Session update from auth change event");
+        set({ user: currentSession.user, session: currentSession });
+      } else {
+        // Clear auth state and decrypted key when session is lost
+        console.log("Session cleared from auth change event");
+        set({ user: null, session: null, decryptedSymmetricKey: null });
+        
+        // Clear key management service
+        if (keyManagementService.isInitialized()) {
+          keyManagementService.clear();
+          console.log("Key management service cleared due to auth change");
+        }
+      }
+    });
+    
+    // Store cleanup function in a module variable to prevent memory leaks
+    // but don't return it to match the Promise<void> signature
+    const cleanup = () => {
+      subscription.unsubscribe();
+    };
+    
+    // Setup cleanup for when component unmounts
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', cleanup);
+    }
+    
+  } catch (error: any) {
+    console.error("Auth initialization error:", error);
+    set({ 
+      user: null, 
+      session: null, 
+      isLoading: false, 
+      error: error instanceof Error ? error.message : "Failed to initialize session." 
+    });
+  }
+},
     //  Logs in an existing user.
     //  @param email - The user's email address.
     //  @param password - The user's password.
@@ -382,6 +381,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 console.error("Failed to initialize key management service:", initError);
                 // Non-fatal error, continue with login
             }
+            console.log("Login response:", JSON.stringify(authData, null, 2));
+            console.log("Cookies after login:", document.cookie);
+
 
             return { success: true };
 
@@ -595,32 +597,90 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     },
 
     /**
-     * Logs out the current user.
-     */
-    logout: async () => {
-        console.log("Logging out...");
-        set({ isLoading: true, error: null });
-        const supabase = createClient();
-        
-        // Clear the session key
+ * Logs out the current user and clears all associated data.
+ * This enhanced version ensures complete cleanup of all user-specific storage.
+ */
+logout: async () => {
+    console.log("Logging out...");
+    set({ isLoading: true, error: null });
+    
+    // Store the current user ID before logout for cleanup
+    const currentUser = get().user;
+    const userId = currentUser?.id;
+    
+    const supabase = createClient();
+    
+    // 1. Clear key management service first
+    try {
+        if (keyManagementService.isInitialized()) {
+            keyManagementService.clear();
+            console.log("Key management service cleared");
+        }
+    } catch (keyServiceError) {
+        console.error("Error clearing key management service:", keyServiceError);
+        // Non-fatal error, continue with logout
+    }
+    
+    // 2. Clean up localStorage keys
+    if (userId) {
         try {
-            await clearSessionKey();
-            console.log("Cleared symmetric key from session storage");
-        } catch (error) {
-            console.error("Error clearing session key:", error);
+            // Access the storage provider through the keyManagementService to clean up stale keys
+            // If we can't access it directly, we'll skip this step
+            const localStorageProvider = await import('@/services/keyManagement/providers/LocalStorageKeyStorage')
+                .then(module => new module.LocalStorageKeyStorage())
+                .catch(err => {
+                    console.error("Could not load LocalStorageKeyStorage:", err);
+                    return null;
+                });
+                
+            if (localStorageProvider && typeof localStorageProvider.cleanupStaleKeys === 'function') {
+                await localStorageProvider.cleanupStaleKeys(userId);
+                console.log("Cleaned up local storage keys");
+            }
+        } catch (storageError) {
+            console.error("Error cleaning up localStorage keys:", storageError);
             // Non-fatal error, continue with logout
         }
-        
-        const { error } = await supabase.auth.signOut();
-        if (error) {
-            console.error("Error logging out:", error);
-            set({ error: error.message, isLoading: false });
-        } else {
-            console.log("Logout successful.");
-            // State update (user, session, key) handled by onAuthStateChange listener
-            set({ isLoading: false }); // Listener will set user/session/key to null
-        }
-    },
+    }
+    
+    // 3. Clear the session key
+    try {
+        await clearSessionKey();
+        console.log("Cleared symmetric key from session storage");
+    } catch (sessionError) {
+        console.error("Error clearing session key:", sessionError);
+        // Non-fatal error, continue with logout
+    }
+    
+    // 4. Sign out from Supabase
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+        console.error("Error logging out from Supabase:", error);
+        set({ error: error.message, isLoading: false });
+        return; // Exit if Supabase signout fails
+    }
+    
+    // 5. Explicitly clear all auth state
+    set({ 
+        user: null,
+        session: null,
+        decryptedSymmetricKey: null,
+        isLoading: false,
+        error: null
+    });
+    
+    // 6. Verify clear was successful
+    const stateAfterLogout = get();
+    if (stateAfterLogout.user || stateAfterLogout.session || stateAfterLogout.decryptedSymmetricKey) {
+        console.error("WARNING: Some auth state remains after logout", {
+            userExists: !!stateAfterLogout.user,
+            sessionExists: !!stateAfterLogout.session,
+            keyExists: !!stateAfterLogout.decryptedSymmetricKey
+        });
+    } else {
+        console.log("Logout successful. All state properly cleared.");
+    }
+},
 
     //  Recovers the symmetric key using the recovery key.
     //  Assumes key data (salt, enc_key_recovery, iv_recovery) for the user
@@ -951,4 +1011,4 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 // --- Optional: Initialize listener on module load ---
 // This ensures the listener is set up once when the store is first imported.
 // Alternatively, call initializeAuth from your root layout/provider.
-useAuthStore.getState().initializeAuth();
+// useAuthStore.getState().initializeAuth();

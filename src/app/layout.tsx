@@ -1,9 +1,14 @@
+
+import { useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
+
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { useAuthStore } from "@/store/authStore";
 import { ModalProvider } from '@/providers/ModalProvider';
 import { SearchProvider } from '@/contexts/SearchContext';
+import { AuthProvider } from '@/providers/AuthProvider';
 
 
 const geistSans = Geist({
@@ -21,6 +26,8 @@ export const metadata: Metadata = {
   description: "Secure & Confidential Access to Generative AI",
 };
 
+
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -31,11 +38,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <AuthProvider>
         <ModalProvider>
           <SearchProvider>
             {children}
           </SearchProvider>
         </ModalProvider>
+        </AuthProvider>
       </body>
     </html>
   );
