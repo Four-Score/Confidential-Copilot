@@ -61,6 +61,12 @@ export const RemindersDropdown: React.FC<RemindersDropdownProps> = ({ open, onCl
     fetchCount();
   };
 
+  const deleteReminder = async (id: string) => {
+    await fetch(`/api/reminders/${id}/delete`, { method: 'DELETE', credentials: 'include' });
+    setReminders((prev) => prev.filter((r) => r.id !== id));
+    fetchCount();
+  };
+
   // Helper to parse action_item if it's a string
   const parseActionItem = (item: any) => {
     if (!item) return {};
@@ -106,14 +112,23 @@ export const RemindersDropdown: React.FC<RemindersDropdownProps> = ({ open, onCl
                     </div>
                   )}
                 </div>
-                {!reminder.read && (
+                <div className="flex items-center gap-2">
+                  {!reminder.read && (
+                    <button
+                      className="ml-2 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                      onClick={() => markAsRead(reminder.id)}
+                    >
+                      Mark as read
+                    </button>
+                  )}
                   <button
-                    className="ml-2 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
-                    onClick={() => markAsRead(reminder.id)}
+                    className="ml-2 text-gray-400 hover:text-red-600 text-lg"
+                    title="Delete reminder"
+                    onClick={() => deleteReminder(reminder.id)}
                   >
-                    Mark as read
+                    &times;
                   </button>
-                )}
+                </div>
               </div>
             );
           })
