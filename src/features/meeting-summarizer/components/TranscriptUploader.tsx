@@ -113,15 +113,6 @@ export function TranscriptUploader({
           </div>
         )}
       </div>
-
-      <Button
-        onClick={handleProcess}
-        className="w-full"
-        isLoading={isProcessing}
-        disabled={isProcessing || !transcriptText.trim()}
-      >
-        {isProcessing ? 'Processing...' : 'Process Transcript'}
-      </Button>
     </div>
   );
 }

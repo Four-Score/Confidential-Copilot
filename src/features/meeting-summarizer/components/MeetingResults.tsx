@@ -10,7 +10,7 @@ interface ActionItem {
 
 interface MeetingResultsProps {
   summary: string;
-  actionItems: ActionItem[];
+  actionItems: ActionItem[] | null;
   onDownloadSummary: () => void;
   onDownloadActionItems: () => void;
 }
@@ -95,6 +95,7 @@ export function MeetingResults({
             <button
               className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
               onClick={onDownloadActionItems}
+              disabled={!actionItems || actionItems.length === 0}
             >
               <svg
                 className="w-4 h-4 mr-1"
@@ -114,7 +115,9 @@ export function MeetingResults({
             </button>
           </div>
           <div className="space-y-3">
-            {actionItems.length === 0 ? (
+            {actionItems === null ? (
+              <p className="text-gray-500 italic">Click "Generate Action Items" to extract tasks from this transcript.</p>
+            ) : actionItems.length === 0 ? (
               <p className="text-gray-500 italic">No action items found in this transcript.</p>
             ) : (
               actionItems.map((item, index) => (

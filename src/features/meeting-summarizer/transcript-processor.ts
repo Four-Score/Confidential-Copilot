@@ -31,7 +31,7 @@ async function callGroqAPI(messages: any[]) {
     }
   }
   
-  async function summarizeTranscript(transcript: string): Promise<string> {
+export async function summarizeTranscript(transcript: string): Promise<string> {
     const messages = [
       {
         role: "system",
@@ -74,7 +74,7 @@ async function callGroqAPI(messages: any[]) {
     }
   }
   
-  async function extractActionItems(transcript: string): Promise<Array<{
+export async function extractActionItems(transcript: string): Promise<Array<{
     task: string;
     assignee: string | null;
     deadline: string | null;
