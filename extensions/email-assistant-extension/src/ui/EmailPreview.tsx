@@ -1,10 +1,11 @@
-
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { IEmailData, IEmailEntities, IEmailAttachment } from '../interfaces/IEmailModels';
 import ResponseEditor from './ResponseEditor';
 import '../styles.css';
 import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../../src/secret';
+import LoginPopup from '../components/common/LoginPopup';
+import ProjectNamePopup from '../components/common/ProjectNamePopup';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -17,31 +18,43 @@ interface EmailPreviewProps {
 
 const EmailPreview: React.FC<EmailPreviewProps> = ({ emailData, entities, emailSummary, onClose }) => {
   const [showResponseEditor, setShowResponseEditor] = useState(false);
-  const [attachments, setAttachments] = useState<IEmailAttachment[]>([...emailData.attachments]);
+  const [attachments, setAttachments] = useState<IEmailAttachment[]>(emailData.attachments || []);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showLoginPopup, setShowLoginPopup] = useState(false);
+  const [showProjectPopup, setShowProjectPopup] = useState(false);
+
+  useEffect(() => {
+    chrome.storage.local.get(['supabaseSession'], result => {
+      const session = result.supabaseSession;
+      setIsAuthenticated(!!session?.access_token && !!session?.refresh_token);
+    });
+  }, []);
 
   const handleGenerateResponse = () => {
-    setShowResponseEditor(true);
+    if (!isAuthenticated) {
+      setShowLoginPopup(true);
+    } else {
+      setShowResponseEditor(true);
+    }
   };
 
-  const handleRemoveAttachment = (id: string) => {
-    setAttachments(prev => prev.filter(att => att.id !== id));
+  const handleSaveToDashboard = () => {
+    if (!isAuthenticated) {
+      setShowLoginPopup(true);
+    } else {
+      setShowProjectPopup(true);
+    }
   };
 
-  const handleSaveToDashboard = async () => {
-    const projectName = prompt('Enter project name:');
-    if (!projectName) return alert('No project name provided.');
-
+  const handleProjectSubmit = async (projectName: string): Promise<boolean> => {
+  try {
     const session = await new Promise<any>((resolve) =>
       chrome.storage.local.get(['supabaseSession'], result => resolve(result.supabaseSession))
     );
 
-    if (!session?.access_token || !session?.refresh_token) {
-      return alert('❌ Not authenticated. Please log in again.');
-    }
-
     await supabase.auth.setSession({
       access_token: session.access_token,
-      refresh_token: session.refresh_token
+      refresh_token: session.refresh_token,
     });
 
     const { data, error } = await supabase
@@ -50,7 +63,10 @@ const EmailPreview: React.FC<EmailPreviewProps> = ({ emailData, entities, emailS
       .eq('name', projectName.trim())
       .single();
 
-    if (error || !data?.id) return alert('❌ Could not find project.');
+    if (error || !data?.id) {
+      console.error('❌ Project not found:', error);
+      return false;
+    }
 
     const payload = {
       id: crypto.randomUUID(),
@@ -62,16 +78,27 @@ const EmailPreview: React.FC<EmailPreviewProps> = ({ emailData, entities, emailS
       entities,
       attachments,
       projectName,
-      projectId: data.id
+      projectId: data.id,
     };
 
-    chrome.storage.local.get(['email_queue'], (result) => {
-      const queue = result.email_queue || [];
-      queue.push(payload);
-      chrome.storage.local.set({ email_queue: queue }, () => {
-        alert(`✅ Email saved under "${projectName}"`);
+    return new Promise((resolve) => {
+      chrome.storage.local.get(['email_queue'], (result) => {
+        const queue = result.email_queue || [];
+        queue.push(payload);
+        chrome.storage.local.set({ email_queue: queue }, () => {
+          resolve(true); // ✅ success confirmation
+        });
       });
     });
+  } catch (err) {
+    console.error('❌ Error saving project:', err);
+    return false;
+  }
+};
+
+
+  const handleRemoveAttachment = (id: string) => {
+    setAttachments(prev => prev.filter(att => att.id !== id));
   };
 
   const formatSize = (bytes: number) => {
@@ -134,6 +161,17 @@ const EmailPreview: React.FC<EmailPreviewProps> = ({ emailData, entities, emailS
         <ResponseEditor
           emailSummary={emailSummary}
           onClose={() => setShowResponseEditor(false)}
+        />
+      )}
+
+      {showLoginPopup && (
+        <LoginPopup onClose={() => setShowLoginPopup(false)} />
+      )}
+
+      {showProjectPopup && (
+        <ProjectNamePopup
+          onClose={() => setShowProjectPopup(false)}
+          onSubmit={handleProjectSubmit}
         />
       )}
     </div>

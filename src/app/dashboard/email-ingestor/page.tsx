@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { chunkText } from '@/lib/pdfUtils';
+import { chunkEmailText } from '@/lib/emailUtils';
 import { generateBatchEmbeddings } from '@/lib/embeddingUtils';
 import { useKeyManagement } from '@/services/keyManagement/useKeyManagement';
 import { useAuthStore } from '@/store/authStore';
@@ -65,7 +65,7 @@ export default function EmailIngestor() {
     for (let index = 0; index < queue.length; index++) {
       const email = queue[index];
       try {
-        const chunks = await chunkText(email.body, {
+        const chunks = await chunkEmailText(email.body, {
           fileName: email.subject,
           documentId: email.id,
         });
@@ -130,16 +130,6 @@ export default function EmailIngestor() {
       console.log('✅ Sent CLEAR_EMAIL_QUEUE message to extension');
     }
   };
-  const [hasPendingEmails, setHasPendingEmails] = useState(false);
-
-useEffect(() => {
-  if (typeof chrome !== 'undefined') {
-    chrome.storage?.local?.get('email_queue', (result) => {
-      const hasPending = Array.isArray(result.email_queue) && result.email_queue.length > 0;
-      setHasPendingEmails(hasPending);
-    });
-  }
-}, []);
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -147,15 +137,6 @@ useEffect(() => {
         <h1 className="text-2xl font-bold">Email Ingestor</h1>
         <ConnectExtensionButton />
       </div>
-      {hasPendingEmails ? (
-  <div className="mb-4 p-4 bg-yellow-100 border border-yellow-300 text-yellow-800 rounded">
-    📨 Pending emails detected. Ingestion will start automatically.
-  </div>
-) : (
-  <div className="mb-4 p-4 bg-green-100 border border-green-300 text-green-800 rounded">
-    ✅ All emails ingested. You're up to date!
-  </div>
-)}
 
       <div className="w-full bg-gray-200 rounded-full h-3 mb-6 overflow-hidden">
         <div
