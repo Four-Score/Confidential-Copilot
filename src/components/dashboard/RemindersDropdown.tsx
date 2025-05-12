@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useUnreadRemindersCount } from '@/hooks/ReminderCount';
 
 interface Reminder {
   id: string;
   action_item: any;
   created_at?: string;
+  read?: boolean;
 }
 
 interface RemindersDropdownProps {
@@ -15,6 +17,7 @@ export const RemindersDropdown: React.FC<RemindersDropdownProps> = ({ open, onCl
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { fetchCount } = useUnreadRemindersCount(open);
 
   useEffect(() => {
     if (open) {
@@ -50,6 +53,14 @@ export const RemindersDropdown: React.FC<RemindersDropdownProps> = ({ open, onCl
     }
   };
 
+  const markAsRead = async (id: string) => {
+    await fetch(`/api/reminders/mark?id=${id}`, { method: 'POST', credentials: 'include' });
+    setReminders((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, read: true } : r))
+    );
+    fetchCount();
+  };
+
   // Helper to parse action_item if it's a string
   const parseActionItem = (item: any) => {
     if (!item) return {};
@@ -80,18 +91,28 @@ export const RemindersDropdown: React.FC<RemindersDropdownProps> = ({ open, onCl
           reminders.map((reminder, idx) => {
             const action = parseActionItem(reminder.action_item);
             return (
-              <div key={reminder.id || idx} className="p-3 border-b last:border-b-0">
-                <div className="font-medium">{action.task || 'Untitled Task'}</div>
-                {action.assignee && (
-                  <div className="text-xs text-gray-500">Assignee: {action.assignee}</div>
-                )}
-                {action.deadline && (
-                  <div className="text-xs text-gray-500">Deadline: {action.deadline}</div>
-                )}
-                {reminder.created_at && (
-                  <div className="text-xs text-gray-400 mt-1">
-                    Added: {new Date(reminder.created_at).toLocaleString()}
-                  </div>
+              <div key={reminder.id || idx} className="p-3 border-b last:border-b-0 flex justify-between items-center">
+                <div>
+                  <div className="font-medium">{action.task || 'Untitled Task'}</div>
+                  {action.assignee && (
+                    <div className="text-xs text-gray-500">Assignee: {action.assignee}</div>
+                  )}
+                  {action.deadline && (
+                    <div className="text-xs text-gray-500">Deadline: {action.deadline}</div>
+                  )}
+                  {reminder.created_at && (
+                    <div className="text-xs text-gray-400 mt-1">
+                      Added: {new Date(reminder.created_at).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+                {!reminder.read && (
+                  <button
+                    className="ml-2 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                    onClick={() => markAsRead(reminder.id)}
+                  >
+                    Mark as read
+                  </button>
                 )}
               </div>
             );

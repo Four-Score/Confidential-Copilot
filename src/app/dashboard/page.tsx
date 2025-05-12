@@ -8,6 +8,7 @@ import { ModesContainer } from '@/components/dashboard/ModesContainer';
 import { useModal } from '@/contexts/ModalContext';
 import { MODAL_ROUTES } from '@/constants/modalRoutes';
 import { RemindersDropdown } from '@/components/dashboard/RemindersDropdown';
+import { useUnreadRemindersCount } from '@/hooks/ReminderCount';
 
 export default function DashboardPage() {
     const router = useRouter();
@@ -15,6 +16,7 @@ export default function DashboardPage() {
     const { openModal } = useModal();
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [showReminders, setShowReminders] = useState(false);
+    const { count, fetchCount } = useUnreadRemindersCount(showReminders);
 
     // Navigate to the meeting summarizer page
     const navigateToMeetingSummarizer = () => {
@@ -27,30 +29,30 @@ export default function DashboardPage() {
     };
 
     // Define modes data for the cards
-      const modes = [
-  {
-    icon: '💬',
-    title: 'Chat Mode',
-    description: 'Interact with your documents through conversational AI'
-  },
-  {
-    icon: '✉️',
-    title: 'Email Mode',
-    description: 'Generate and analyze emails with AI assistance',
-    onClick: () => router.push('/dashboard/email-ingestor') // no .tsx in routes
-  },
-  {
-    icon: '🗣️',
-    title: 'Meeting Mode',
-    description: 'Summarize and extract insights from meeting transcripts',
-     onClick: navigateToMeetingSummarizer
-  },
-  {
-    icon: '📄',
-    title: 'Document Mode',
-    description: 'Process and interact with your document collection'
-  }
-];
+    const modes = [
+        {
+            icon: '💬',
+            title: 'Chat Mode',
+            description: 'Interact with your documents through conversational AI'
+        },
+        {
+            icon: '✉️',
+            title: 'Email Mode',
+            description: 'Generate and analyze emails with AI assistance',
+            onClick: () => router.push('/dashboard/email-ingestor') // no .tsx in routes
+        },
+        {
+            icon: '🗣️',
+            title: 'Meeting Mode',
+            description: 'Summarize and extract insights from meeting transcripts',
+            onClick: navigateToMeetingSummarizer
+        },
+        {
+            icon: '📄',
+            title: 'Document Mode',
+            description: 'Process and interact with your document collection'
+        }
+    ];
 
     // Retrieval button click handler - will be implemented later
     const handleRetrievalClick = () => {
@@ -80,6 +82,11 @@ export default function DashboardPage() {
                             onClick={() => setShowReminders((prev) => !prev)}
                         >
                             🔔
+                            {count > 0 && (
+                                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5">
+                                    {count}
+                                </span>
+                            )}
                         </Button>
                         <RemindersDropdown open={showReminders} onClose={() => setShowReminders(false)} />
                     </div>
