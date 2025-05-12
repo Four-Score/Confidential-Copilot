@@ -29,7 +29,8 @@ export default function DashboardPage() {
         {
             icon: '💬',
             title: 'Chat Mode',
-            description: 'Interact with your documents through conversational AI'
+            description: 'Interact with your documents through conversational AI',
+            onClick: () => router.push('/dashboard/chat')  // Add this line
         },
         {
             icon: '✉️',
@@ -39,12 +40,14 @@ export default function DashboardPage() {
         {
             icon: '🗣️',
             title: 'Meeting Mode',
-            description: 'Summarize and extract insights from meeting transcripts'
+            description: 'Summarize and extract insights from meeting transcripts',
+            onClick: navigateToMeetingSummarizer  // This likely already exists
         },
         {
             icon: '📄',
             title: 'Document Mode',
-            description: 'Process and interact with your document collection'
+            description: 'Process and interact with your document collection',
+            onClick: navigateToProjects  // This likely already exists
         }
     ];
 
