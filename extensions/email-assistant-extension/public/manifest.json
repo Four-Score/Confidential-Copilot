@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "Confidential Copilot: Email Mode",
+  "version": "0.1.0",
+  "description": "A secure email assistant with privacy-preserving features",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwDHIZaZ4XaYHiE0iTHGsobwdgxO7juC1nsqUSU5Nd+iSzRxvaAB55MSch54yi7xHe1UB7ysLriWwG83mGDQ9tTOEVEwAVkPSMxZyY4m3is9cHteayIZHJyifirHtXfxE6SuGOislcj8AXIzG9QKaC32kIYM4h2m4JKcy4WApN0cKxKTigDSjfuXA3rzdtHdP7T2uGAa2H5q0enSsF0+taamlt1MuyOeOwsYUxbbF9khdXyqstefXJN764TMpTR5U0pRoYOKMsYMZPi6j791dgsjQ8Yrs+r2y8hSvaH5OR4vDfVtzxoqXaCYEoIKwtOU2hRFzNZw2DEZlMwIDAQAB",
+  "permissions": [
+    "storage", 
+    "activeTab", 
+    "scripting", 
+    "identity",
+    "identity.email"
+  ],
+  "host_permissions": [
+    "https://mail.google.com/*", 
+    "https://www.googleapis.com/*",
+    "https://gmail.googleapis.com/*",
+    "https://tczdnhbosuoqmgkpqnaz.supabase.co/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://mail.google.com/*"],
+      "js": ["content.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/cc-logo.png"],
+      "matches": ["https://mail.google.com/*"]
+    },
+    {
+      "resources": ["auth.html"],
+      "matches": ["<all_urls>"]
+    },
+    {
+      "resources": ["sync.html", "sync.js"],  
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "oauth2": {
+    "client_id": "574622732867-d7eq9v1skfclr3503hi29klekn4rjr9u.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/gmail.readonly",
+      "https://www.googleapis.com/auth/gmail.compose",
+      "https://www.googleapis.com/auth/gmail.send"
+    ]
+  }
+}

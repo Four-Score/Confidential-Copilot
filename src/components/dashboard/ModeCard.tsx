@@ -7,20 +7,15 @@ interface ModeCardProps {
   onClick?: () => void;
 }
 
-export const ModeCard: React.FC<ModeCardProps> = ({
-  icon,
-  title,
-  description,
-  onClick
-}) => {
+export const ModeCard: React.FC<ModeCardProps> = ({ icon, title, description, onClick }) => {
   return (
-    <div 
+    <div
       onClick={onClick}
-      className="bg-white rounded-xl shadow-md transition-all duration-300 hover:shadow-lg hover:translate-y-[-5px] p-6 cursor-pointer flex flex-col items-center text-center h-full"
+      className="cursor-pointer p-4 bg-gray-50 hover:bg-gray-100 border rounded-md shadow-sm transition-all"
     >
-      <div className="text-4xl mb-4">{icon}</div>
-      <h3 className="text-xl font-semibold mb-2 text-purple-700">{title}</h3>
-      <p className="text-gray-500 text-sm">{description}</p>
+      <div className="text-3xl mb-2">{icon}</div>
+      <h3 className="font-semibold text-md">{title}</h3>
+      <p className="text-sm text-gray-600 mt-1">{description}</p>
     </div>
   );
 };

@@ -1,0 +1,24 @@
+# Build output
+/dist
+/build
+
+# Dependencies
+/node_modules
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# VS Code settings
+.vscode/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+**/secret.ts
+
+
+# Environment variables (if you use .env for API keys)
+.env
+.env.local
