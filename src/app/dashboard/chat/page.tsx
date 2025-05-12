@@ -10,13 +10,17 @@ import { formatSearchResultsToContext } from '@/lib/chatUtils';
 import { SearchResults } from '@/components/search/SearchResults'; 
 import { LoadingIndicator } from '@/components/chat/LoadingIndicator';
 import { ErrorMessage } from '@/components/chat/ErrorMessage';
-
+import { ChatMessage } from '@/components/chat/ChatMessage';
+import { ChatInput } from '@/components/chat/ChatInput';
+import { NewChatButton } from '@/components/chat/NewChatButton';
+import { ModelSelector } from '@/components/chat/ModelSelector';
+import { ChatResponseContainer } from '@/components/chat/ChatResponseContainer';
 
 export default function ChatPage() {
     const hasStartedRetrievalFlow = useRef(false);
     const hasInitializedChat = useRef(false);
     const router = useRouter();
-    const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
+    const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string; contextResults?: any }[]>([]);
     const [inputValue, setInputValue] = useState('');
     const [selectedModel, setSelectedModel] = useState('llama-3.3-70b-versatile');
     const [isLoading, setIsLoading] = useState(false);
@@ -61,25 +65,6 @@ export default function ChatPage() {
         }
     }, [selectedProjectId, selectedDocuments, startRetrievalFlow]);
 
-    const handleNewChat = () => {
-        if (messages.length > 0) {
-            if (confirm('Start a new chat? This will clear the current conversation.')) {
-                setMessages([]);
-                // Reset the initialization flag to allow new welcome message
-                hasInitializedChat.current = false;
-                initializeChat();
-            }
-        }
-    };
-
-    const handleModelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        setSelectedModel(e.target.value);
-    };
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setInputValue(e.target.value);
-    };
-
     // Function to initialize chat after project and document selection
     const initializeChat = () => {
         // Clear any previous messages
@@ -103,213 +88,183 @@ export default function ChatPage() {
         }
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputValue.trim() || isLoading) return;
-    
-    // Make sure we have project and document selections
-    if (!selectedProjectId || !selectedDocuments || selectedDocuments.length === 0) {
-        // Show error and start retrieval flow
-        alert('Please select project and documents first');
-        startRetrievalFlow();
-        return;
-    }
-    
-    try {
-        // Set loading state
-        setIsLoading(true);
-        
-        // Add user message to chat
-        const userMessage = { role: 'user' as const, content: inputValue };
-        setMessages(prev => [...prev, userMessage]);
-        
-        // Clear input field
-        setInputValue('');
-        
-        // Get document IDs for search
-        const documentIds = selectedDocuments.map(doc => doc.id);
-        
-        // Step 1: Perform vector search
-        const searchResponse = await search(inputValue, selectedProjectId, documentIds);
-        
-        // Step 2: Format search results for LLM context - this will be implemented in chatUtils.ts
-        const formattedContext = formatSearchResultsToContext(searchResponse);
-        
-        // Step 3: API call will be implemented in step 6
-        // For now, just show a placeholder response with the context
-        try {
-            // Call the LLM API with the formatted context and query
-            const llmResponse = await fetch('/api/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    query: inputValue,
-                    context: formattedContext,
-                    model: selectedModel
-                })
-            });
-            
-            if (!llmResponse.ok) {
-                const errorData = await llmResponse.json();
-                throw new Error(errorData.error || 'Failed to get response from LLM');
+    const handleNewChat = () => {
+        if (messages.length > 0) {
+            if (confirm('Start a new chat? This will clear the current conversation.')) {
+                setMessages([]);
+                // Reset the initialization flag to allow new welcome message
+                hasInitializedChat.current = false;
+                initializeChat();
             }
+        }
+    };
+
+    const handleModelChange = (modelId: string) => {
+        setSelectedModel(modelId);
+    };
+
+    const handleSubmit = async (content: string) => {
+        if (!content.trim() || isLoading) return;
+        
+        // Make sure we have project and document selections
+        if (!selectedProjectId || !selectedDocuments || selectedDocuments.length === 0) {
+            // Show error and start retrieval flow
+            alert('Please select project and documents first');
+            startRetrievalFlow();
+            return;
+        }
+        
+        try {
+            // Set loading state
+            setIsLoading(true);
             
-            const data = await llmResponse.json();
+            // Add user message to chat
+            const userMessage = { role: 'user' as const, content: content };
+            setMessages(prev => [...prev, userMessage]);
             
-            // Add the actual LLM response to the chat
-            const assistantMessage = { 
-                role: 'assistant' as const, 
-                content: data.response,
-                contextResults: searchResponse // Store the search results for display
-            };
+            // Get document IDs for search
+            const documentIds = selectedDocuments.map(doc => doc.id);
             
-            setMessages(prev => [...prev, assistantMessage]);
+            // Step 1: Perform vector search
+            const searchResponse = await search(content, selectedProjectId, documentIds);
+            
+            // Step 2: Format search results for LLM context - this will be implemented in chatUtils.ts
+            const formattedContext = formatSearchResultsToContext(searchResponse);
+            
+            try {
+                // Call the LLM API with the formatted context and query
+                const llmResponse = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: content,
+                        context: formattedContext,
+                        model: selectedModel
+                    })
+                });
+                
+                if (!llmResponse.ok) {
+                    const errorData = await llmResponse.json();
+                    throw new Error(errorData.error || 'Failed to get response from LLM');
+                }
+                
+                const data = await llmResponse.json();
+                
+                // Add the actual LLM response to the chat
+                const assistantMessage = { 
+                    role: 'assistant' as const, 
+                    content: data.response,
+                    contextResults: searchResponse // Store the search results for display
+                };
+                
+                setMessages(prev => [...prev, assistantMessage]);
+            } catch (error) {
+                console.error('Error calling LLM API:', error);
+                setError(error instanceof Error ? error.message : 'Failed to get a response from the AI service');
+                
+                // Add error message to chat
+                setMessages(prev => [...prev, { 
+                    role: 'assistant' as const, 
+                    content: 'Sorry, I encountered an error while generating a response. Please try again.'
+                }]);
+            }
         } catch (error) {
-            console.error('Error calling LLM API:', error);
-            setError(error instanceof Error ? error.message : 'Failed to get a response from the AI service');
+            console.error('Chat error:', error);
             
-            // Add error message to chat
+            // Set specific error message
+            const errorMessage = error instanceof Error 
+                ? error.message 
+                : 'An unknown error occurred while processing your request.';
+            
+            setError(errorMessage);
+            
             setMessages(prev => [...prev, { 
                 role: 'assistant' as const, 
-                content: 'Sorry, I encountered an error while generating a response. Please try again.'
+                content: 'Sorry, I encountered an error while processing your request. Please try again or select different documents.'
             }]);
+        } finally {
+            setIsLoading(false);
         }
-    } catch (error) {
-        console.error('Chat error:', error);
-        
-        // Set specific error message
-        const errorMessage = error instanceof Error 
-            ? error.message 
-            : 'An unknown error occurred while processing your request.';
-        
-        setError(errorMessage);
-        
-        setMessages(prev => [...prev, { 
-            role: 'assistant' as const, 
-            content: 'Sorry, I encountered an error while processing your request. Please try again or select different documents.'
-        }]);
-    } finally {
-        setIsLoading(false);
-    }
-};
+    };
 
     return (
-        <div className="min-h-screen flex flex-col bg-gray-50">
+        <div className="min-h-screen flex flex-col bg-gradient-to-b from-gray-50 to-gray-100">
             {/* Header */}
-            <header className="bg-white shadow-sm p-4 flex justify-between items-center border-b border-gray-200">
-                <div className="flex items-center">
-                    <button 
-                        onClick={handleNewChat} 
-                        className="mr-4 px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-100"
-                    >
-                        New Chat
-                    </button>
-                    <h1 className="font-semibold">Chat Mode</h1>
+            <header className="bg-white shadow-md px-6 py-4 flex justify-between items-center border-b border-gray-200 sticky top-0 z-10">
+                <div className="flex items-center space-x-4">
+                    <NewChatButton 
+                        hasMessages={messages.length > 0}
+                        onNewChat={handleNewChat}
+                    />
+                    <h1 className="font-semibold text-lg text-gray-800">Chat Mode</h1>
                 </div>
-                <div className="flex items-center">
-                    <label htmlFor="model-selector" className="mr-2 text-sm">Model:</label>
-                    <select
-                        id="model-selector"
-                        value={selectedModel}
-                        onChange={handleModelChange}
-                        className="border rounded p-1 text-sm"
-                    >
-                        {models.map(model => (
-                            <option key={model.id} value={model.id}>
-                                {model.name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
+                <ModelSelector 
+                    models={models}
+                    selectedModel={selectedModel}
+                    onModelChange={handleModelChange}
+                />
             </header>
             
             {/* Chat Container */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 max-w-4xl w-full mx-auto">
                 {messages.length === 0 ? (
-                    <div className="text-center mt-10 text-gray-500">
-                        Start a conversation by typing a message below.
+                    <div className="flex flex-col items-center justify-center h-full">
+                        <div className="p-8 bg-white rounded-xl shadow-sm border border-gray-200 text-center max-w-md">
+                            <div className="text-4xl mb-4">💬</div>
+                            <h3 className="text-xl font-medium text-gray-800 mb-2">Start a Conversation</h3>
+                            <p className="text-gray-600">Ask questions about your documents and I'll help you find answers.</p>
+                        </div>
                     </div>
                 ) : (
-                    messages.map((message: { role: 'user' | 'assistant'; content: string; contextResults?: any }, index: number) => (
-                        <div key={index} className="w-full">
-                            {/* Message Bubble */}
-                            <div 
-                                className={`p-3 rounded-lg ${
-                                    message.role === 'user' 
-                                        ? 'bg-blue-600 text-white ml-auto max-w-3xl' 
-                                        : 'bg-white border border-gray-200 max-w-4xl'
-                                }`}
-                            >
-                                {message.content}
-                            </div>
-                            
-                            {/* Context Cards (only show for assistant messages with context) */}
-                            {message.role === 'assistant' && message.contextResults && (
-                                <div className="mt-2 mb-4">
-                                    <details className="bg-gray-50 rounded-md">
-                                        <summary className="p-2 text-sm text-gray-600 cursor-pointer hover:bg-gray-100 rounded-md">
-                                            View sources from your documents
-                                        </summary>
-                                        <div className="p-2">
-                                            <SearchResults
-                                                results={message.contextResults}
-                                                isLoading={false}
-                                                error={null}
-                                                query={messages[index-1]?.content || ""}
-                                            />
-                                        </div>
-                                    </details>
+                    <div className="space-y-6">
+                        {messages.map((message, index) => 
+                            message.role === 'user' ? (
+                                <ChatMessage key={index} message={message} />
+                            ) : (
+                                <div key={index} className="space-y-2">
+                                    {message.contextResults ? (
+                                        <ChatResponseContainer 
+                                            content={message.content}
+                                            contextResults={message.contextResults}
+                                            query={index > 0 && messages[index-1].role === 'user' ? messages[index-1].content : ""}
+                                            isLoading={false}
+                                            error={null}
+                                        />
+                                    ) : (
+                                        <ChatMessage message={message} />
+                                    )}
                                 </div>
-                            )}
-                        </div>
-                    ))
+                            )
+                        )}
+                    </div>
                 )}
+                
                 {isLoading && (
-                    <div className="flex justify-center my-4">
-                        <LoadingIndicator text="Processing your request..." size="md" />
+                    <div className="flex justify-center my-8">
+                        <LoadingIndicator text="Processing your request..." size="lg" />
                     </div>
                 )}
 
-                {/* Add error display right after loading indicator */}
                 {error && (
-                    <div className="my-4">
+                    <div className="my-4 max-w-xl mx-auto">
                         <ErrorMessage 
                             message={error}
-                            onRetry={() => {
-                                setError(null);
-                            }}
+                            onRetry={() => setError(null)}
                         />
                     </div>
                 )}
             </div>
             
-            {/* Input Area */}
-            <div className="border-t border-gray-200 p-4 bg-white">
-                <form onSubmit={handleSubmit} className="flex gap-2">
-                    <textarea
-                        value={inputValue}
-                        onChange={handleInputChange}
-                        placeholder="Type your message..."
-                        className="flex-1 p-2 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        rows={2}
-                        disabled={isLoading}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleSubmit(e);
-                            }
-                        }}
+            {/* Input Area - Fixed at the bottom */}
+            <div className="border-t border-gray-200 bg-white p-4 md:p-6 sticky bottom-0 z-10 shadow-md">
+                <div className="max-w-4xl mx-auto">
+                    <ChatInput 
+                        isLoading={isLoading} 
+                        onSubmit={handleSubmit}
                     />
-                    <button 
-                        type="submit" 
-                        disabled={!inputValue.trim() || isLoading}
-                        className="self-end px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-                    >
-                        Send
-                    </button>
-                </form>
+                </div>
             </div>
         </div>
     );

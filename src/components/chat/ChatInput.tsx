@@ -55,14 +55,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({ isLoading, onSubmit }) => 
 
   return (
     <form onSubmit={handleSubmit} className="border-t border-gray-200 p-4 bg-white">
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-end">
         <textarea
           ref={textareaRef}
           value={inputValue}
           onChange={handleTextareaChange}
           onKeyDown={handleKeyDown}
           placeholder="Type your message..."
-          className="flex-1 p-3 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[50px]"
+          className="flex-1 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[50px] shadow-sm"
           rows={1}
           disabled={isLoading}
           aria-label="Message input"
@@ -70,7 +70,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ isLoading, onSubmit }) => 
         <button 
           type="submit" 
           disabled={!inputValue.trim() || isLoading}
-          className="self-end px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="self-end px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
         >
           {isLoading ? (
             <span className="flex items-center">
@@ -81,7 +81,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({ isLoading, onSubmit }) => 
               Sending...
             </span>
           ) : (
-            'Send'
+            <span className="flex items-center">
+              <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+              </svg>
+              Send
+            </span>
           )}
         </button>
       </div>

@@ -33,8 +33,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         <div 
           className={`rounded-lg p-3 break-words ${
             isUser 
-              ? 'bg-blue-600 text-white' 
-              : 'bg-white border border-gray-200 text-gray-800'
+              ? 'bg-blue-600 text-white shadow-sm' 
+              : 'bg-white border border-gray-200 text-gray-800 shadow-sm'
           }`}
         >
           {/* Format message content with proper line breaks */}
