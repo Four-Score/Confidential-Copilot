@@ -8,10 +8,10 @@ export function createClient() {
     {
       // Add these options for persistence
       cookieOptions: {
-        name: 'sb-auth',
         maxAge: 60 * 60 * 24 * 7, // 1 week
         sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production'
+        secure: process.env.NODE_ENV === 'production',
+        path: '/'
       }
     }
   );

@@ -34,7 +34,7 @@ export default function DashboardPage() {
             icon: '💬',
             title: 'Chat Mode',
 
-            description: 'Interact with your documents through conversational AI'
+            description: 'Interact with your documents through conversational AI',
             onClick: () => router.push('/dashboard/chat')  // Add this line
         },
         {
