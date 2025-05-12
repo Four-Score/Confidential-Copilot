@@ -206,15 +206,11 @@ export const DataSelectionModal: React.FC = () => {
 
   // Handle proceed to search
   const handleProceed = () => {
-    if (!hasSelectedDocuments()) return;
-    
-    // Proceed to search modal
-    openModal(MODAL_ROUTES.SEARCH_INTERFACE, { 
-      currentView: MODAL_ROUTES.SEARCH_INTERFACE,
-      projectId: selectedProjectId,
-      projectName: selectedProjectName 
-    });
-  };
+  if (!hasSelectedDocuments()) return;
+  
+  // Close modal and return to chat page
+  closeModal();
+};
 
   return (
     <Modal
@@ -369,7 +365,7 @@ export const DataSelectionModal: React.FC = () => {
             onClick={handleProceed}
             className={`px-6 py-2 ${!hasSelectedDocuments() ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            Search Selected Documents
+            Continue to Chat
           </Button>
         </div>
       </div>

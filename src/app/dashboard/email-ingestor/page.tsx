@@ -132,25 +132,77 @@ export default function EmailIngestor() {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Email Ingestor</h1>
-        <ConnectExtensionButton />
-      </div>
+  <div className="p-6 max-w-4xl mx-auto font-sans">
+    <div className="flex justify-between items-center mb-8">
+      <h1 className="text-3xl font-bold text-gray-800">Email Ingestor</h1>
+      <ConnectExtensionButton />
+    </div>
 
-      <div className="w-full bg-gray-200 rounded-full h-3 mb-6 overflow-hidden">
-        <div
-          className="bg-gradient-to-r from-blue-500 to-blue-700 h-full transition-all duration-500 ease-out"
-          style={{ width: `${progress}%` }}
-        />
+    {/* Email Mode Feature Highlight */}
+    <div className="relative bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl shadow-sm p-6 mb-8">
+      <div className="flex items-start space-x-4">
+        <div className="text-3xl">📬</div>
+        <div>
+          <h2 className="text-lg font-semibold text-blue-900 mb-1">
+            Welcome to <span className="text-blue-700">Email Mode</span>
+          </h2>
+          <p className="text-sm text-gray-700">
+            Automatically ingest and summarize emails directly into your Confidential Copilot projects.
+          </p>
+          <p className="text-sm text-gray-600 mt-1">
+            Email Mode works with our browser extension — be sure it's connected!
+          </p>
+        </div>
       </div>
+    </div>
 
-      <iframe
-        src="chrome-extension://kfllijpookcgihkcclkjeobcdcejcmlb/sync.html"
-        id="email-sync-iframe"
-        style={{ display: 'none' }}
-        title="Email Queue Sync"
+    {/* Ingestion Feedback */}
+    {progress > 0 && progress < 100 && (
+      <div className="mb-4 text-blue-700 font-medium animate-pulse flex items-center space-x-2">
+        <svg className="w-5 h-5 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8v8H4z"
+          />
+        </svg>
+        <span>Ingesting emails... please wait</span>
+      </div>
+    )}
+
+    {progress === 100 && (
+      <div className="mb-4 text-green-600 font-medium flex items-center space-x-2 transition-opacity duration-300">
+        <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24">
+          <path stroke="currentColor" strokeWidth="2" d="M5 13l4 4L19 7" />
+        </svg>
+        <span>All emails ingested successfully!</span>
+      </div>
+    )}
+
+    {/* Progress Bar */}
+    <div className="w-full bg-gray-200 rounded-full h-3 mb-6 overflow-hidden">
+      <div
+        className="bg-gradient-to-r from-blue-500 to-blue-700 h-full transition-all duration-500 ease-out"
+        style={{ width: `${progress}%` }}
       />
     </div>
-  );
+
+    {/* Hidden iframe for sync */}
+    <iframe
+      src="chrome-extension://kfllijpookcgihkcclkjeobcdcejcmlb/sync.html"
+      id="email-sync-iframe"
+      style={{ display: 'none' }}
+      title="Email Queue Sync"
+    />
+  </div>
+);
+
 }
