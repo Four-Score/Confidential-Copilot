@@ -1,10 +1,10 @@
 // src/app/api/process-transcript/route.ts
 import { NextResponse } from 'next/server';
-import { processTranscript } from '@/features/meeting-summarizer/transcript-processor';
+import { processTranscript, summarizeTranscript, extractActionItems } from '@/features/meeting-summarizer/transcript-processor';
 
 export async function POST(request: Request) {
   try {
-    const { transcript } = await request.json();
+    const { transcript, only } = await request.json();
 
     if (!transcript || typeof transcript !== 'string' || transcript.trim() === '') {
       return NextResponse.json(
@@ -13,6 +13,17 @@ export async function POST(request: Request) {
       );
     }
 
+    if (only === 'summary') {
+      const summary = await summarizeTranscript(transcript);
+      return NextResponse.json({ summary });
+    }
+
+    if (only === 'action_items') {
+      const action_items = await extractActionItems(transcript);
+      return NextResponse.json({ action_items });
+    }
+
+    // Default: do both (legacy)
     const results = await processTranscript(transcript);
     return NextResponse.json(results);
   } catch (error) {

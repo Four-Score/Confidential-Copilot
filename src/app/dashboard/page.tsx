@@ -7,12 +7,16 @@ import { Button } from '@/components/ui/Button';
 import { ModesContainer } from '@/components/dashboard/ModesContainer';
 import { useModal } from '@/contexts/ModalContext';
 import { MODAL_ROUTES } from '@/constants/modalRoutes';
+import { RemindersDropdown } from '@/components/dashboard/RemindersDropdown';
+import { useUnreadRemindersCount } from '@/hooks/ReminderCount';
 
 export default function DashboardPage() {
     const router = useRouter();
     const { user } = useAuthStore();
     const { openModal } = useModal();
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [showReminders, setShowReminders] = useState(false);
+    const { count, fetchCount } = useUnreadRemindersCount(showReminders);
 
     // Navigate to the meeting summarizer page
     const navigateToMeetingSummarizer = () => {
@@ -29,7 +33,8 @@ export default function DashboardPage() {
         {
             icon: '💬',
             title: 'Chat Mode',
-            description: 'Interact with your documents through conversational AI',
+
+            description: 'Interact with your documents through conversational AI'
             onClick: () => router.push('/dashboard/chat')  // Add this line
         },
         {
@@ -41,7 +46,10 @@ export default function DashboardPage() {
         {
             icon: '🗣️',
             title: 'Meeting Mode',
-            description: 'Summarize and extract insights from meeting transcripts'
+
+            description: 'Summarize and extract insights from meeting transcripts',
+            onClick: navigateToMeetingSummarizer
+
         },
         {
             icon: '📄',
@@ -71,9 +79,21 @@ export default function DashboardPage() {
                             className="pl-10 border border-gray-300 rounded-md px-4 py-2 w-64"
                         />
                     </div>
-                    <Button variant="outline" size="sm">
-                        🔔
-                    </Button>
+                    <div className="relative">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowReminders((prev) => !prev)}
+                        >
+                            🔔
+                            {count > 0 && (
+                                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5">
+                                    {count}
+                                </span>
+                            )}
+                        </Button>
+                        <RemindersDropdown open={showReminders} onClose={() => setShowReminders(false)} />
+                    </div>
                     <Button variant="outline" size="sm" className="flex items-center gap-1">
                         <span className="text-xs">NEW FOLDER</span>
                         📁

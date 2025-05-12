@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { TranscriptUploader } from '@/features/meeting-summarizer/components/TranscriptUploader';
 import { MeetingResults } from '@/features/meeting-summarizer/components/MeetingResults';
 
-// Define or import ActionItem type
 type ActionItem = {
   task: string;
   assignee: string | null;
@@ -13,48 +12,69 @@ type ActionItem = {
 
 export default function MeetingSummarizerPage() {
   const [transcriptText, setTranscriptText] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [results, setResults] = useState<{ summary: string; action_items: ActionItem[] } | null>(null);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [actionItems, setActionItems] = useState<ActionItem[] | null>(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleTranscriptReady = (text: string) => {
     setTranscriptText(text);
+    setSummary(null);
+    setActionItems(null);
     setError(null);
   };
 
-  const handleProcess = async () => {
-    if (!transcriptText.trim()) {
-      setError('Please upload or enter a transcript before processing.');
-      return;
-    }
-
-    setIsProcessing(true);
+  const handleSummarize = async () => {
+    setIsSummarizing(true);
     setError(null);
-
+    setSummary(null);
     try {
       const response = await fetch('/api/process-transcript', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript: transcriptText }),
+        body: JSON.stringify({ transcript: transcriptText, only: 'summary' }),
       });
-
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to process transcript');
+        throw new Error(errorData.error || 'Failed to generate summary');
       }
-
       const data = await response.json();
-      setResults(data);
+      setSummary(data.summary);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
-      setIsProcessing(false);
+      setIsSummarizing(false);
     }
   };
 
-  // Helper to convert action items to readable text
-  function actionItemsToText(actionItems: ActionItem[]): string {
-    return actionItems.map((item, idx) =>
+  const handleExtractActionItems = async () => {
+    setIsExtracting(true);
+    setError(null);
+    setActionItems(null);
+    try {
+      const response = await fetch('/api/process-transcript', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript: transcriptText, only: 'action_items' }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to extract action items');
+      }
+      const data = await response.json();
+      setActionItems(data.action_items);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  // Helper for download
+  function actionItemsToText(items: ActionItem[] | null): string {
+    if (!items) return '';
+    return items.map((item, idx) =>
       `Action Item ${idx + 1}:\nTask: ${item.task}\nAssignee: ${item.assignee ?? 'N/A'}\nDeadline: ${item.deadline ?? 'N/A'}\n`
     ).join('\n');
   }
@@ -70,34 +90,55 @@ export default function MeetingSummarizerPage() {
 
       <TranscriptUploader
         onTranscriptReady={handleTranscriptReady}
-        onProcessStart={handleProcess}
-        isProcessing={isProcessing}
+        onProcessStart={() => {}}
+        isProcessing={false}
       />
 
-      {results && (
-        <MeetingResults
-          summary={results.summary}
-          actionItems={results.action_items}
-          onDownloadSummary={() => {
-            const blob = new Blob([results.summary], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'summary.txt';
-            a.click();
-            URL.revokeObjectURL(url);
-          }}
-          onDownloadActionItems={() => {
-            const text = actionItemsToText(results.action_items);
-            const blob = new Blob([text], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'action_items.txt';
-            a.click();
-            URL.revokeObjectURL(url);
-          }}
-        />
+      <div className="flex gap-4 mt-4">
+        <button
+          className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+          onClick={handleSummarize}
+          disabled={!transcriptText.trim() || isSummarizing}
+        >
+          {isSummarizing ? 'Generating Summary...' : 'Generate Summary'}
+        </button>
+        <button
+          className="px-4 py-2 bg-green-600 text-white rounded disabled:opacity-50"
+          onClick={handleExtractActionItems}
+          disabled={!transcriptText.trim() || !summary || isExtracting}
+        >
+          {isExtracting ? 'Extracting Action Items...' : 'Generate Action Items'}
+        </button>
+      </div>
+
+      {(summary || actionItems) && (
+        <div className="mt-8">
+          <MeetingResults
+            summary={summary || ''}
+            actionItems={actionItems}
+            onDownloadSummary={() => {
+              if (!summary) return;
+              const blob = new Blob([summary], { type: 'text/plain' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'summary.txt';
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            onDownloadActionItems={() => {
+              if (!actionItems) return;
+              const text = actionItemsToText(actionItems);
+              const blob = new Blob([text], { type: 'text/plain' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'action_items.txt';
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          />
+        </div>
       )}
     </div>
   );
