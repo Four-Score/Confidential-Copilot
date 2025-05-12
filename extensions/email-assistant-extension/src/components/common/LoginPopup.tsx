@@ -32,15 +32,15 @@ export default function LoginPopup({
       zIndex: 1000,
     }}>
       <div style={{
-        backgroundColor: '#002D72',
-        color: 'white',
+        backgroundColor: 'var(--primary-blue)',
+        color: 'var(--text-white)',
         padding: '2rem',
         borderRadius: '0.75rem',
         width: '90%',
         maxWidth: '400px',
         position: 'relative',
         textAlign: 'center',
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)'
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
       }}>
         {onClose && (
           <button
@@ -50,7 +50,7 @@ export default function LoginPopup({
               top: '0.5rem',
               right: '0.75rem',
               background: 'transparent',
-              color: 'white',
+              color: 'var(--text-white)',
               border: 'none',
               fontSize: '1.25rem',
               fontWeight: 'bold',
@@ -65,8 +65,8 @@ export default function LoginPopup({
         <button
           onClick={handleLogin}
           style={{
-            backgroundColor: 'white',
-            color: '#002D72',
+            backgroundColor: 'var(--text-white)',
+            color: 'var(--primary-blue)',
             padding: '0.5rem 1.5rem',
             borderRadius: '0.375rem',
             fontWeight: 'bold',

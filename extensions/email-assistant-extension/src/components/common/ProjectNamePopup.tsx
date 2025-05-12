@@ -42,15 +42,15 @@ const ProjectNamePopup: React.FC<ProjectNamePopupProps> = ({ onSubmit, onClose }
       zIndex: 1000,
     }}>
       <div style={{
-        backgroundColor: '#002D72',
-        color: 'white',
+        backgroundColor: 'var(--primary-blue)',
+        color: 'var(--text-white)',
         padding: '2rem',
         borderRadius: '0.75rem',
         width: '90%',
         maxWidth: '400px',
         position: 'relative',
         textAlign: 'center',
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)'
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
       }}>
         {onClose && (
           <button
@@ -60,7 +60,7 @@ const ProjectNamePopup: React.FC<ProjectNamePopupProps> = ({ onSubmit, onClose }
               top: '0.5rem',
               right: '0.75rem',
               background: 'transparent',
-              color: 'white',
+              color: 'var(--text-white)',
               border: 'none',
               fontSize: '1.25rem',
               fontWeight: 'bold',
@@ -71,7 +71,9 @@ const ProjectNamePopup: React.FC<ProjectNamePopupProps> = ({ onSubmit, onClose }
           </button>
         )}
         <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.5rem' }}>Enter Project Name</h2>
-        <p style={{ marginBottom: '1rem', fontSize: '0.9rem', color: '#D1D5DB' }}>This helps organize your saved summaries.</p>
+        <p style={{ marginBottom: '1rem', fontSize: '0.9rem', color: '#d1d5db' }}>
+          This helps organize your saved summaries.
+        </p>
 
         <input
           type="text"
@@ -82,15 +84,15 @@ const ProjectNamePopup: React.FC<ProjectNamePopupProps> = ({ onSubmit, onClose }
             width: '100%',
             padding: '0.5rem',
             borderRadius: '0.375rem',
-            border: 'none',
+            border: '1px solid #ccc',
             marginBottom: '0.75rem',
             color: 'black'
           }}
           disabled={submitting || success}
         />
 
-        {error && <p style={{ color: '#F87171', fontSize: '0.85rem', marginBottom: '0.5rem' }}>{error}</p>}
-        {success && <p style={{ color: '#34D399', fontSize: '0.85rem', marginBottom: '0.5rem' }}>✅ Saved successfully!</p>}
+        {error && <p style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '0.5rem' }}>{error}</p>}
+        {success && <p style={{ color: '#10b981', fontSize: '0.85rem', marginBottom: '0.5rem' }}>✅ Saved successfully!</p>}
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
           <button
@@ -98,7 +100,7 @@ const ProjectNamePopup: React.FC<ProjectNamePopupProps> = ({ onSubmit, onClose }
             style={{
               padding: '0.5rem 1.25rem',
               borderRadius: '0.375rem',
-              backgroundColor: '#6B7280',
+              backgroundColor: '#6b7280',
               color: 'white',
               border: 'none',
               cursor: 'pointer'
@@ -110,8 +112,8 @@ const ProjectNamePopup: React.FC<ProjectNamePopupProps> = ({ onSubmit, onClose }
           <button
             onClick={handleSubmit}
             style={{
-              backgroundColor: 'white',
-              color: '#002D72',
+              backgroundColor: 'var(--text-white)',
+              color: 'var(--primary-blue)',
               padding: '0.5rem 1.25rem',
               borderRadius: '0.375rem',
               fontWeight: 'bold',
