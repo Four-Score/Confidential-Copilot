@@ -40,7 +40,8 @@ export default function DashboardPage() {
   {
     icon: '🗣️',
     title: 'Meeting Mode',
-    description: 'Summarize and extract insights from meeting transcripts'
+    description: 'Summarize and extract insights from meeting transcripts',
+     onClick: navigateToMeetingSummarizer
   },
   {
     icon: '📄',
