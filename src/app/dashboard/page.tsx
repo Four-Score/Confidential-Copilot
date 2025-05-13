@@ -54,7 +54,9 @@ export default function DashboardPage() {
         {
             icon: '📄',
             title: 'Document Mode',
-            description: 'Process and interact with your document collection'
+            description: 'Process and interact with your document collection',
+            onClick: () => router.push('/dashboard/document') // route 
+
         }
     ];
 
@@ -169,7 +171,10 @@ export default function DashboardPage() {
 
                             {/* Other Icons */}
                             <div className="flex flex-col items-center">
-                                <div className="text-xl">📄</div>
+                            <div
+                            onClick={() => router.push('/dashboard/document')}
+                            className="text-xl cursor-pointer hover:text-blue-600 transition-colors"
+                            title="Document Mode">📄</div>
                                 <span className="text-xs mt-1">Document mode</span>
                             </div>
                             <div className="flex flex-col items-center">
