@@ -19,7 +19,7 @@ export default function ConnectExtensionPage() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: 'http://localhost:3000/extension-login-callback',
+        emailRedirectTo: 'https://confidential-copilot.onrender.com/extension-login-callback',
         shouldCreateUser: true,
       },
     });

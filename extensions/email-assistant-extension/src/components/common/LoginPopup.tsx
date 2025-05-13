@@ -19,7 +19,7 @@ export default function LoginPopup({
     if (onLogin) {
       onLogin();
     } else {
-      window.open('http://localhost:3000/connect-extension', '_blank');
+      window.open('https://confidential-copilot.onrender.com/connect-extension', '_blank');
     }
   };
 

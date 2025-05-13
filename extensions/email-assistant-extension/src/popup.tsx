@@ -36,7 +36,7 @@ const PopupApp: React.FC = () => {
       console.log('🔑 Using token from storage:', supabaseSession.access_token); // <--- Confirm this
   
       try {
-        const res = await fetch('http://localhost:3000/api/email-mode/receive', {
+        const res = await fetch('https://confidential-copilot.onrender.com/api/email-mode/receive', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${supabaseSession.access_token}`, // ✅ Use correct token

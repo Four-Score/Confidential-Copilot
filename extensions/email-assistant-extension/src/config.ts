@@ -1,5 +1,5 @@
 export const config = {
-  apiUrl: 'http://localhost:3000/api',
+  apiUrl: 'https://confidential-copilot.onrender.com/api',
 
   features: {
     encryptionEnabled: false,
