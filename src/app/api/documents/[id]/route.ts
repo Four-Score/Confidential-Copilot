@@ -12,7 +12,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
-    const { id: documentId } = await params;
+    const { id: documentId } = params;
     
     // Initialize Supabase client with cookies
     const supabase = await createClient();
@@ -104,7 +104,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
-    const { id: documentId } = await params;
+    const { id: documentId } = params;
     
     // Initialize Supabase client with cookies
     const supabase = await createClient();
