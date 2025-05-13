@@ -11,7 +11,6 @@ async function verifyAccess(
   projectId: string,
   websiteId: string
 ) {
-  // First verify project ownership
   const { data: project, error: projectError } = await supabase
     .from('projects')
     .select('id')
@@ -20,13 +19,12 @@ async function verifyAccess(
     .single();
 
   if (projectError || !project) {
-    return { 
-      allowed: false, 
-      error: projectError ? projectError.message : 'Project not found or access denied' 
+    return {
+      allowed: false,
+      error: projectError?.message || 'Project not found or access denied'
     };
   }
 
-  // Then verify the website belongs to this project
   const { data: website, error: websiteError } = await supabase
     .from('v2_documents')
     .select('id')
@@ -35,9 +33,9 @@ async function verifyAccess(
     .single();
 
   if (websiteError || !website) {
-    return { 
-      allowed: false, 
-      error: websiteError ? websiteError.message : 'Website not found or does not belong to this project' 
+    return {
+      allowed: false,
+      error: websiteError?.message || 'Website not found or does not belong to this project'
     };
   }
 
@@ -49,59 +47,43 @@ async function verifyAccess(
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string, websiteId: string } }
+  context: any
 ): Promise<NextResponse> {
   try {
-    const { id: projectId, websiteId } = await params;
-    
-    // Initialize Supabase client
+    const { id: projectId, websiteId } = context.params;
+
     const supabase = await createClient();
-    
-    // Check if user is authenticated
+
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
-    
-    // Verify access
+
     const { allowed, error: accessError } = await verifyAccess(supabase, user.id, projectId, websiteId);
     if (!allowed) {
-      return NextResponse.json(
-        { error: accessError },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: accessError }, { status: 403 });
     }
-    
-    // Retrieve website details
+
     const { data: website, error: websiteError } = await supabase
       .from('v2_documents')
       .select('id, name, type, upload_date, file_size, content, metadata')
       .eq('id', websiteId)
       .single();
-      
+
     if (websiteError) {
       console.error('Error fetching website:', websiteError);
-      return NextResponse.json(
-        { error: 'Failed to fetch website details' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to fetch website details' }, { status: 500 });
     }
-    
-    // Count the chunks
+
     const { count: chunkCount, error: countError } = await supabase
       .from('v2_vector_chunks')
       .select('id', { count: 'exact', head: true })
       .eq('document_id', websiteId);
-      
+
     if (countError) {
       console.error('Error counting chunks:', countError);
-      // Continue anyway, as this is not critical
     }
-    
-    // Format the response
+
     const websiteDetails = {
       id: website.id,
       name: website.name,
@@ -115,15 +97,12 @@ export async function GET(
       metadata: website.metadata || {},
       chunk_count: chunkCount || 0
     };
-    
+
     return NextResponse.json(websiteDetails);
-    
+
   } catch (error) {
     console.error('Error in website details endpoint:', error);
-    return NextResponse.json(
-      { error: 'Server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -132,56 +111,40 @@ export async function GET(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string, websiteId: string } }
+  context: any
 ): Promise<NextResponse> {
   try {
-    const { id: projectId, websiteId } = params;
-    
-    // Initialize Supabase client
+    const { id: projectId, websiteId } = context.params;
+
     const supabase = await createClient();
-    
-    // Check if user is authenticated
+
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
-    
-    // Verify access
+
     const { allowed, error: accessError } = await verifyAccess(supabase, user.id, projectId, websiteId);
     if (!allowed) {
-      return NextResponse.json(
-        { error: accessError },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: accessError }, { status: 403 });
     }
-    
-    // Delete the website (chunks will be deleted by CASCADE)
+
     const { error: deleteError } = await supabase
       .from('v2_documents')
       .delete()
       .eq('id', websiteId);
-      
+
     if (deleteError) {
       console.error('Error deleting website:', deleteError);
-      return NextResponse.json(
-        { error: 'Failed to delete website' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to delete website' }, { status: 500 });
     }
-    
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Website deleted successfully' 
+
+    return NextResponse.json({
+      success: true,
+      message: 'Website deleted successfully'
     });
-    
+
   } catch (error) {
     console.error('Error in website deletion endpoint:', error);
-    return NextResponse.json(
-      { error: 'Server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

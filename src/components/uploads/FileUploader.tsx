@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import { MAX_FILE_SIZE } from '@/lib/pdfUtils';
+import { MAX_FILE_SIZE } from '@/lib/fileConfig'; 
 import ErrorDisplay from './ErrorDisplay';
 import ProgressBar from './ProgressBar';
 

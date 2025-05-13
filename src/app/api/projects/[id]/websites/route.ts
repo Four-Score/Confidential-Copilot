@@ -15,9 +15,9 @@ async function verifyProjectAccess(supabase: SupabaseClient, userId: string, pro
     .single();
 
   if (error || !data) {
-    return { 
-      exists: false, 
-      error: error ? error.message : 'Project not found or access denied' 
+    return {
+      exists: false,
+      error: error ? error.message : 'Project not found or access denied'
     };
   }
 
@@ -29,51 +29,36 @@ async function verifyProjectAccess(supabase: SupabaseClient, userId: string, pro
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: any
 ): Promise<NextResponse> {
   try {
-    const projectId = params.id;
-    
-    // Initialize Supabase client
+    const projectId = context.params.id;
+
     const supabase = await createClient();
-    
-    // Check if user is authenticated
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
-    
-    // Verify project ownership
+
     const { exists, error: accessError } = await verifyProjectAccess(supabase, user.id, projectId);
     if (!exists) {
-      return NextResponse.json(
-        { error: accessError },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: accessError }, { status: 403 });
     }
-    
-    // Parse request body
+
     const body = await request.json();
     const { url } = body;
-    
+
     if (!url) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
-    
-    // Validate URL format and basic accessibility
+
     const validationResult = await validateWebsiteUrl(url);
     if (!validationResult.isValid) {
-      return NextResponse.json({ 
-        error: validationResult.message || 'Invalid URL' 
-      }, { status: 400 });
+      return NextResponse.json({ error: validationResult.message || 'Invalid URL' }, { status: 400 });
     }
-    
-    // Generate a job ID for processing tracking
+
     const jobId = crypto.randomUUID();
-    
+
     return NextResponse.json({
       jobId,
       url,
@@ -91,63 +76,48 @@ export async function POST(
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: any
 ): Promise<NextResponse> {
   try {
-    const { id: projectId } = await params;
-    
-    // Initialize Supabase client
+    const projectId = context.params.id;
+
     const supabase = await createClient();
-    
-    // Check if user is authenticated
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
-    }
-    
-    // Verify project ownership
-    const { exists, error: accessError } = await verifyProjectAccess(supabase, user.id, projectId);
-    if (!exists) {
-      return NextResponse.json(
-        { error: accessError },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    // Get query parameters
+    const { exists, error: accessError } = await verifyProjectAccess(supabase, user.id, projectId);
+    if (!exists) {
+      return NextResponse.json({ error: accessError }, { status: 403 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const sortBy = searchParams.get('sortBy') || 'upload_date';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
     const search = searchParams.get('search') || '';
-    
-    // Query v2_documents table for websites in this project
+
     let query = supabase
       .from('v2_documents')
       .select('id, name, type, upload_date, file_size, metadata')
       .eq('project_id', projectId)
       .eq('type', 'website');
-    
-    // Add search if provided
+
     if (search) {
       query = query.ilike('name', `%${search}%`);
     }
-    
-    // Add sorting
+
     if (sortBy && ['name', 'upload_date', 'file_size'].includes(sortBy)) {
       query = query.order(sortBy, { ascending: sortOrder === 'asc' });
     }
-    
+
     const { data: websites, error } = await query;
-    
+
     if (error) {
       console.error('Error fetching websites:', error);
       return NextResponse.json({ error: 'Failed to fetch websites' }, { status: 500 });
     }
-    
-    // Format response to include URL and other website-specific metadata
+
     const formattedWebsites = websites.map(website => ({
       id: website.id,
       name: website.name,
@@ -160,7 +130,7 @@ export async function GET(
       favicon: website.metadata?.favicon || '',
       metadata: website.metadata || {}
     }));
-    
+
     return NextResponse.json({ websites: formattedWebsites });
   } catch (error) {
     console.error('Error fetching websites:', error);

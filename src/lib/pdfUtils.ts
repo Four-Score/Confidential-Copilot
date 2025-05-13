@@ -1,14 +1,12 @@
 import * as pdfjs from 'pdfjs-dist';
+import { MAX_FILE_SIZE as DEFAULT_MAX_FILE_SIZE_CONFIG, SUPPORTED_PDF_MIME_TYPE, SUPPORTED_TXT_MIME_TYPE } from './fileConfig';
+
 
 // Configure the worker source for PDF.js
 if (typeof window !== 'undefined') {
   pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 }
 
-/**
- * Maximum file size in bytes (5MB)
- */
-export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 /**
  * Default chunk size for text splitting
@@ -26,8 +24,8 @@ export const DEFAULT_CHUNK_OVERLAP = 200;
  * @param maxFileSize Maximum file size in bytes
  * @returns Object containing validation result and error message if any
  */
-export function validatePdfFile(file: File, maxFileSize = MAX_FILE_SIZE): { valid: boolean; error?: string } {
-  if (file.type !== 'application/pdf' && file.type !== 'text/plain') {
+export function validatePdfFile(file: File, maxFileSize = DEFAULT_MAX_FILE_SIZE_CONFIG): { valid: boolean; error?: string } {
+  if (file.type !== SUPPORTED_PDF_MIME_TYPE && file.type !== SUPPORTED_TXT_MIME_TYPE) {
     return { valid: false, error: 'Only PDF and TXT files are supported.' };
   }
   if (file.size > maxFileSize) {

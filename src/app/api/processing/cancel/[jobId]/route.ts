@@ -7,14 +7,14 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { jobId: string } }
+  context: any
 ): Promise<NextResponse> {
   try {
-    const { jobId } = params;
-    
+    const jobId = context.params.jobId;
+
     // Initialize Supabase client
     const supabase = await createClient();
-    
+
     // Check if user is authenticated
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
@@ -23,7 +23,7 @@ export async function POST(
         { status: 401 }
       );
     }
-    
+
     // Make an internal request to update the job status
     const response = await fetch(`${req.nextUrl.origin}/api/documents/progress`, {
       method: 'POST',
@@ -37,7 +37,7 @@ export async function POST(
         progress: 0
       })
     });
-    
+
     if (!response.ok) {
       const errorData = await response.json();
       return NextResponse.json(
@@ -45,12 +45,12 @@ export async function POST(
         { status: response.status }
       );
     }
-    
+
     return NextResponse.json({
       success: true,
       message: 'Job cancelled successfully'
     });
-    
+
   } catch (error) {
     console.error('Error cancelling job:', error);
     return NextResponse.json(

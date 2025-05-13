@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
-import { MAX_FILE_SIZE } from '@/lib/pdfUtils';
+import { MAX_FILE_SIZE, SUPPORTED_PDF_MIME_TYPE } from '@/lib/fileConfig';
+
 
 /**
  * Validates a file before upload.
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
     
     // Check file type
-    if (file.type !== 'application/pdf') {
+    if (file.type !== SUPPORTED_PDF_MIME_TYPE) {
       return NextResponse.json(
         { error: 'Only PDF files are currently supported' },
         { status: 400 }

@@ -6,19 +6,7 @@ import { generateBatchEmbeddings } from '@/lib/embeddingUtils';
 import { useKeyManagement } from '@/services/keyManagement/useKeyManagement';
 import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/Button';
-
-export function ConnectExtensionButton() {
-  const handleConnect = () => {
-    const url = 'http://localhost:3000/connect-extension';
-    window.open(url, '_blank');
-  };
-
-  return (
-    <div className="flex flex-col items-start space-y-2">
-      <Button onClick={handleConnect}>Connect to Extension</Button>
-    </div>
-  );
-}
+import ConnectExtensionButton from '@/components/extension/ConnectExtensionButton';
 
 interface EmailQueueItem {
   id: string;
