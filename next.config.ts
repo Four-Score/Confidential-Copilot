@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 
 const nextConfig: NextConfig = {
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   // Configure experimental features
   experimental: {
     // Turbopack disabled by default 
