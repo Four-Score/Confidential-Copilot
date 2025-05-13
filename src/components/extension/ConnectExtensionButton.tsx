@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button';
 
 export default function ConnectExtensionButton() {
   const handleConnect = () => {
-    const url = 'http://localhost:3000/connect-extension';
+    const url = 'https://confidential-copilot.onrender.com/connect-extension';
     window.open(url, '_blank');
   };
 
