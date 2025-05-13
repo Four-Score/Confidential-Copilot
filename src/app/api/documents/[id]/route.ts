@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 
+
 /**
  * Handles document-specific operations
  * GET: Retrieves document details and metadata
@@ -9,10 +10,10 @@ import { cookies } from 'next/headers';
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
-    const { id: documentId } = params;
+    const documentId = context.params.id;
     
     // Initialize Supabase client with cookies
     const supabase = await createClient();
