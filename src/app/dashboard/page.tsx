@@ -6,16 +6,17 @@ import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/Button';
 import { ModesContainer } from '@/components/dashboard/ModesContainer';
 import { useModal } from '@/contexts/ModalContext';
-import { MODAL_ROUTES } from '@/constants/modalRoutes';
 import { RemindersDropdown } from '@/components/dashboard/RemindersDropdown';
+import { UserDropdown } from '@/components/dashboard/UserDropdown';
 import { useUnreadRemindersCount } from '@/hooks/ReminderCount';
+import Image from 'next/image';
 
 export default function DashboardPage() {
     const router = useRouter();
     const { user } = useAuthStore();
     const { openModal } = useModal();
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [showReminders, setShowReminders] = useState(false);
+    const [showUserDropdown, setShowUserDropdown] = useState(false);
     const { count, fetchCount } = useUnreadRemindersCount(showReminders);
 
     // Navigate to the meeting summarizer page
@@ -28,224 +29,158 @@ export default function DashboardPage() {
         router.push('/projects');
     };
 
+    // Navigate to YouTube summarizer page
+    const navigateToYouTubeSummarizer = () => {
+        router.push('/dashboard/youtube-summarizer'); // Assuming this is the route
+    };
+
     // Define modes data for the cards
     const modes = [
         {
-            icon: '💬',
-            title: 'Chat Mode',
-
-            description: 'Interact with your documents through conversational AI',
-            onClick: () => router.push('/dashboard/chat')  // Add this line
+            icon: <div className="w-12 h-12 rounded-lg bg-sky-100 flex items-center justify-center"> {/* Updated color */}
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-sky-600">
+                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <line x1="10" y1="9" x2="8" y2="9"></line>
+                    </svg>
+                  </div>,
+            title: 'Your Projects', // Updated title
+            description: 'Access and manage your data projects', // Updated description
+            onClick: navigateToProjects
         },
         {
-            icon: '✉️',
+            icon: <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                  </div>,
+            title: 'Chat Mode',
+            description: 'Interact with your documents through conversational AI',
+            onClick: () => router.push('/dashboard/chat')
+        },
+        {
+            icon: <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-purple-600">
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                      <polyline points="22,6 12,13 2,6"></polyline>
+                    </svg>
+                  </div>,
             title: 'Email Mode',
             description: 'Generate and analyze emails with AI assistance',
-            onClick: () => router.push('/dashboard/email-ingestor') // no .tsx in routes
+            onClick: () => router.push('/dashboard/email-ingestor')
         },
         {
-            icon: '🗣️',
+            icon: <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-600">
+                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                      <line x1="12" y1="19" x2="12" y2="23"></line>
+                      <line x1="8" y1="23" x2="16" y2="23"></line>
+                    </svg>
+                  </div>,
             title: 'Meeting Mode',
-
             description: 'Summarize and extract insights from meeting transcripts',
             onClick: navigateToMeetingSummarizer
-
         },
         {
-            icon: '📄',
+            icon: <div className="w-12 h-12 rounded-lg bg-amber-100 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-600">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <line x1="16" y1="13" x2="8" y2="13"></line>
+                      <line x1="16" y1="17" x2="8" y2="17"></line>
+                      <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                  </div>,
             title: 'Document Mode',
             description: 'Process and interact with your document collection',
-            onClick: () => router.push('/dashboard/document') // route 
-
+            onClick: () => router.push('/dashboard/document')
+        },
+        {
+            icon: <div className="w-12 h-12 rounded-lg bg-red-100 flex items-center justify-center"> {/* YouTube icon */}
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-600">
+                        <path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17"></path>
+                        <path d="m10 15 5-3-5-3z"></path>
+                    </svg>
+                  </div>,
+            title: 'YouTube Summarizer',
+            description: 'Summarize and get insights from YouTube videos',
+            onClick: navigateToYouTubeSummarizer
         }
     ];
-
-    // Retrieval button click handler - will be implemented later
-    const handleRetrievalClick = () => {
-        openModal(MODAL_ROUTES.PROJECT_SELECTION, { currentView: MODAL_ROUTES.PROJECT_SELECTION });
-    };
-
     return (
-        <div className="min-h-screen flex flex-col bg-gray-50">
+        <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-100 to-slate-100"> {/* Updated background */}
             {/* Header */}
-            <header className="bg-white shadow-sm p-3 flex justify-between items-center border-b border-gray-200">
-                <div className="flex items-center">
-                    <h1 className="text-xl font-bold text-purple-700 ml-2">CONFIDENTIAL COPILOT</h1>
+            <header className="bg-white/95 backdrop-blur-lg shadow-sm p-4 flex justify-between items-center border-b border-gray-200 sticky top-0 z-30">
+                <div className="flex items-center gap-3"> {/* Increased gap */}
+                    <div 
+                        onClick={() => router.push('/')} 
+                        className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-md cursor-pointer hover:shadow-lg transition-all duration-200"
+                    > {/* Style update & made clickable */}
+                        <span className="text-xl font-bold text-white">CC</span>
+                    </div>
+                    <h1 className="text-xl font-semibold text-gray-800">CONFIDENTIAL COPILOT</h1> {/* Style update */}
                 </div>
                 <div className="flex items-center gap-4">
-                    <div className="relative">
-                        <div className="absolute left-3 top-2.5 h-4 w-4 text-gray-400">🔍</div>
-                        <input
-                            type="text"
-                            placeholder="SEARCH"
-                            className="pl-10 border border-gray-300 rounded-md px-4 py-2 w-64"
-                        />
-                    </div>
+                    {/* Search bar removed */}
                     <div className="relative">
                         <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setShowReminders((prev) => !prev)}
+                            className="rounded-full hover:bg-gray-200/70 p-2" // Style update
+                            onClick={() => setShowReminders(!showReminders)}
                         >
-                            🔔
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
                             {count > 0 && (
-                                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5">
+                                <span className="absolute top-0 right-0 block h-4 w-4 rounded-full bg-red-500 ring-2 ring-white text-xs text-white flex items-center justify-center">
                                     {count}
                                 </span>
                             )}
                         </Button>
                         <RemindersDropdown open={showReminders} onClose={() => setShowReminders(false)} />
                     </div>
-                    <Button variant="outline" size="sm" className="flex items-center gap-1">
-                        <span className="text-xs">NEW FOLDER</span>
-                        📁
-                    </Button>
-                    <div className="flex items-center gap-2">
-                        <div className="text-right">
-                            <p className="font-medium">{user?.email || 'MAHA KHAN'}</p>
-                            <p className="text-xs text-gray-500">Software Engineer</p>
-                        </div>
-                        <div className="h-8 w-8 bg-gray-300 rounded-full flex items-center justify-center">
-                            <span className="text-sm">MK</span>
+                      {/* Enhanced user profile section */}
+                    <div className="flex items-center gap-3 border-l pl-4 border-gray-200">
+                        {user && (
+                            <div className="text-right">
+                                <p className="text-sm font-medium text-gray-800">{user.email}</p>
+                            </div>
+                        )}
+                        <div className="relative cursor-pointer" onClick={() => setShowUserDropdown(!showUserDropdown)}>
+                            <div className="h-10 w-10 bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-full flex items-center justify-center text-lg font-semibold shadow-sm hover:shadow-md transition-all duration-200 border-2 border-white">
+                                {user?.email?.charAt(0).toUpperCase() || 'U'}
+                            </div>
+                            <div className="absolute -bottom-1 -right-1 h-3 w-3 bg-green-500 rounded-full border-2 border-white"></div>
+                            <UserDropdown open={showUserDropdown} onClose={() => setShowUserDropdown(false)} />
                         </div>
                     </div>
-                    <Button 
-                        variant="secondary" 
-                        size="sm" 
-                        onClick={async () => {
-                            await useAuthStore.getState().logout();
-                            router.push('/');  // Redirect to homepage after logout
-                        }}
-                    >
-                        LOG OUT
-                    </Button>
                 </div>
             </header>
 
             {/* Main Content */}
             <div className="flex flex-1">
-                {/* Sidebar Toggle Button - Outside of sidebar */}
-                <div className="relative">
-                    <button 
-                        onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
-                        className="absolute top-4 left-4 z-10 p-2 bg-white border border-gray-200 rounded-md"
-                    >
-                        {isSidebarOpen ? '◀' : '▶'}
-                    </button>
-                </div>
-                
-                {/* Sidebar - Completely hideable */}
-                {isSidebarOpen && (
-                    <aside className="w-48 bg-white border-r border-gray-200 transition-all duration-300 flex flex-col pt-16">
-                        {/* Sidebar Content */}
-                        <nav className="space-y-6 px-2">
-                            {/* First Icon */}
-                            <div className="flex flex-col items-center">
-                                <div className="text-xl">🏠</div>
-                                <span className="text-xs mt-1">COMPONENTS</span>
-                            </div>
-
-                            {/* Projects Icon */}
-                            <div className="flex flex-col items-center">
-                                <div
-                                    onClick={navigateToProjects}
-                                    className="text-xl cursor-pointer hover:text-blue-600 transition-colors"
-                                    title="My Projects"
-                                >
-                                    📁
-                                </div>
-                                <span className="text-xs mt-1">Projects</span>
-                            </div>
-
-                            {/* Meeting Summarizer Icon - Second Position */}
-                            <div className="flex flex-col items-center">
-                                <div
-                                    onClick={navigateToMeetingSummarizer}
-                                    className="text-xl cursor-pointer hover:text-blue-600 transition-colors"
-                                    title="Transcript Summarizer"
-                                >
-                                    📝
-                                </div>
-                                <span className="text-xs mt-1">Transcript Summarizer</span>
-                            </div>
-
-                            {/* Other Icons */}
-                            <div className="flex flex-col items-center">
-                            <div
-                            onClick={() => router.push('/dashboard/document')}
-                            className="text-xl cursor-pointer hover:text-blue-600 transition-colors"
-                            title="Document Mode">📄</div>
-                                <span className="text-xs mt-1">Document mode</span>
-                            </div>
-                            <div className="flex flex-col items-center">
-                                <div className="text-xl">💬</div>
-                                <span className="text-xs mt-1">Chat mode</span>
-                            </div>
-                            <div className="flex flex-col items-center">
-                            <div
-                            onClick={() => router.push('/dashboard/email-summarizer')}
-                            className="text-xl cursor-pointer hover:text-blue-600 transition-colors"
-                            title="Email Mode">✉️</div>
-                            <span className="text-xs mt-1">Email mode</span>
-                            </div>
-                            <div className="flex flex-col items-center">
-                                <div 
-                                onClick={() => router.push('/dashboard/youtube-transcript')}
-                                className="text-xl cursor-pointer hover:text-blue-600 transition-colors"
-                                title="YouTube Transcript">
-                                    🎥
-                                </div>
-
-                                <span className="text-xs mt-1">Youtube</span>
-                            </div>
-                            <div className="flex flex-col items-center">
-                                <div className="text-xl">📑</div>
-                                <span className="text-xs mt-1">Templates</span>
-                            </div>
-                        </nav>
-                    </aside>
-                )}
-
                 {/* Main Dashboard */}
-                <main className={`flex-1 p-4 ${!isSidebarOpen ? 'ml-10' : ''}`}>
-                    {/* Top Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                        <div 
-                            onClick={navigateToProjects}
-                            className="bg-white p-4 rounded-md shadow-sm border border-gray-100 hover:shadow-md cursor-pointer transition-all duration-200"
-                        >
-                            <h2 className="font-bold text-sm text-blue-700">PROJECTS</h2>
-                            <p className="text-xs text-gray-500">Since last month</p>
-                        </div>
-                        <div className="bg-white p-4 rounded-md shadow-sm border border-gray-100">
-                            <h2 className="font-bold text-sm">RESEARCH PAPER</h2>
-                            <p className="text-xs text-gray-500">MALWARE DETECTION</p>
-                        </div>
-                        <div className="bg-white p-4 rounded-md shadow-sm border border-gray-100">
-                            <h2 className="font-bold text-sm">AGREEMENT</h2>
-                            <p className="text-xs text-gray-500">COMPANY</p>
-                        </div>
-                        <div className="bg-white p-4 rounded-md shadow-sm border border-gray-100">
-                            <h2 className="font-bold text-sm">RESUME</h2>
-                            <p className="text-xs text-gray-500">MAHA KHAN</p>
+                <main className="flex-1 p-8"> {/* Updated padding, removed conditional margin */}
+                    {/* Welcome Card */}
+                    <div className="mb-10"> {/* Increased margin-bottom */}
+                        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200/80 hover:shadow-xl transition-all duration-300"> {/* Style update */}
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <h2 className="text-2xl font-semibold text-gray-800">Welcome to Your Dashboard</h2>
+                                    <p className="text-gray-600 mt-1">Access your projects and use different interaction modes to work with your data securely.</p>
+                                </div>
+                                <div className="p-3 bg-gradient-to-tr from-amber-400 to-orange-500 rounded-full shadow-md">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Replace Content Sections with ModesContainer */}
+                    {/* Interaction Modes Section */}
                     <div className="mb-8">
                         <ModesContainer modes={modes} />
-                    </div>
-                    
-                    {/* Retrieval Button - Small and unobtrusive in the corner */}
-                    <div className="flex justify-end mt-4">
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="text-xs bg-gray-50 border-gray-300 text-gray-600 hover:bg-gray-100"
-                            onClick={handleRetrievalClick}
-                        >
-                            Retrieval
-                        </Button>
                     </div>
                 </main>
             </div>

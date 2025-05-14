@@ -11,11 +11,11 @@ export const ModeCard: React.FC<ModeCardProps> = ({ icon, title, description, on
   return (
     <div
       onClick={onClick}
-      className="cursor-pointer p-4 bg-gray-50 hover:bg-gray-100 border rounded-md shadow-sm transition-all"
+      className="cursor-pointer p-6 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-300"
     >
-      <div className="text-3xl mb-2">{icon}</div>
-      <h3 className="font-semibold text-md">{title}</h3>
-      <p className="text-sm text-gray-600 mt-1">{description}</p>
+      <div className="text-4xl mb-3 text-purple-600">{icon}</div>
+      <h3 className="font-semibold text-lg text-gray-800">{title}</h3>
+      <p className="text-sm text-gray-600 mt-2">{description}</p>
     </div>
   );
 };
