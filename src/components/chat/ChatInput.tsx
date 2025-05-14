@@ -53,42 +53,41 @@ export const ChatInput: React.FC<ChatInputProps> = ({ isLoading, onSubmit }) => 
     }
   };
 
-  return (
-    <form onSubmit={handleSubmit} className="border-t border-gray-200 p-4 bg-white">
-      <div className="flex gap-2 items-end">
-        <textarea
-          ref={textareaRef}
-          value={inputValue}
-          onChange={handleTextareaChange}
-          onKeyDown={handleKeyDown}
-          placeholder="Type your message..."
-          className="flex-1 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[50px] shadow-sm"
-          rows={1}
-          disabled={isLoading}
-          aria-label="Message input"
-        />
-        <button 
-          type="submit" 
-          disabled={!inputValue.trim() || isLoading}
-          className="self-end px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
-        >
-          {isLoading ? (
-            <span className="flex items-center">
-              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+  return (    <form onSubmit={handleSubmit} className="border-t border-gray-200 p-4 bg-white sticky bottom-0">
+      <div className="flex gap-3 items-end max-w-5xl mx-auto">
+        <div className="relative flex-1">
+          <textarea
+            ref={textareaRef}
+            value={inputValue}
+            onChange={handleTextareaChange}
+            onKeyDown={handleKeyDown}
+            placeholder="Type your message... (Shift+Enter for new line)"
+            className="w-full p-4 pr-12 border border-gray-300 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[56px] shadow-sm transition-all bg-white"
+            rows={1}
+            disabled={isLoading}
+            aria-label="Message input"
+          />
+          <button 
+            type="submit" 
+            disabled={!inputValue.trim() || isLoading}
+            className="absolute right-2 bottom-2 p-2 rounded-lg text-blue-600 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            aria-label="Send message"
+          >
+            {isLoading ? (
+              <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              Sending...
-            </span>
-          ) : (
-            <span className="flex items-center">
-              <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+            ) : (
+              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
               </svg>
-              Send
-            </span>
-          )}
-        </button>
+            )}
+          </button>
+        </div>
+      </div>
+      <div className="text-xs text-center mt-2 text-gray-500">
+        Your messages are processed securely with client-side encryption
       </div>
     </form>
   );

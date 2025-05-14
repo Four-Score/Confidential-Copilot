@@ -42,15 +42,21 @@ export default function ProjectCard({ project, onDelete }: ProjectCardProps) {
       day: 'numeric'
     });
   };
-  
-  return (
+    return (
     <Link href={`/projects/${project.id}`} className="block group">
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 group-hover:shadow-lg group-hover:border-blue-200 transition-all duration-300 relative overflow-hidden h-full flex flex-col">
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 group-hover:shadow-xl group-hover:border-blue-300 transition-all duration-300 transform group-hover:-translate-y-1 relative overflow-hidden h-full flex flex-col">
         {/* Card accent color top bar */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+        <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-600 to-indigo-700"></div>
         
         <div className="flex justify-between items-start mb-4">
-          <h3 className="text-xl font-semibold text-gray-800 truncate group-hover:text-blue-700 transition-colors">{project.name}</h3>
+          <div className="flex items-center">
+            <div className="mr-3 bg-blue-100 p-2.5 rounded-lg shadow-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-800 truncate group-hover:text-blue-700 transition-colors">{project.name}</h3>
+          </div>
           <button
             onClick={handleDelete}
             disabled={isDeleting}
@@ -104,7 +110,6 @@ export default function ProjectCard({ project, onDelete }: ProjectCardProps) {
           {/* Divider */}
           <div className="border-t border-gray-100 pt-3 mb-3"></div>
 
-          
           <div className="flex justify-between items-center text-xs text-gray-500 mt-3">
             <span className="flex items-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -112,8 +117,7 @@ export default function ProjectCard({ project, onDelete }: ProjectCardProps) {
               </svg>
               {formatDate(project.created_at)}
             </span>
-            
-            <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium group-hover:bg-blue-100 transition-colors">
+              <div className="bg-blue-50 text-blue-700 px-3.5 py-1.5 rounded-full text-xs font-medium group-hover:bg-blue-500 group-hover:text-white transition-all duration-300 shadow-sm">
               View Project →
             </div>
           </div>

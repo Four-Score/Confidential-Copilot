@@ -77,9 +77,10 @@ Your answer should:
 1. Be directly relevant to the user's query
 2. Use ONLY information from the provided context, not your general knowledge
 3. Be accurate and factual
-4. Include specific references to the source documents where appropriate
 5. Be conversational but professional in tone
 6. Be concise but thorough
+
+If there is no context or the contxt is irrelevant to the query, briefly state this and provide a general response to the query using your own knowledge (only if possible).
 
 ### Answer:`;
 }

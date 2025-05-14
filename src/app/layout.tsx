@@ -19,6 +19,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Confidential Copilot - CC",
   description: "Secure & Confidential Access to Generative AI",
+  icons: {
+    icon: '/favicon.ico', // Or your icon's path e.g. '/cc-logo.png'
+  },
 };
 
 export default function RootLayout({

@@ -110,26 +110,24 @@ export default function DashboardPage() {
             onClick: navigateToYouTubeSummarizer
         }
     ];
-    return (
-        <div className="h-screen flex flex-col overflow-hidden bg-gradient-to-br from-gray-100 to-slate-100"> {/* Fixed height and eliminated scroll */}
+    return (        <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-100 to-slate-100">
             {/* Header */}
             <header className="bg-white/95 backdrop-blur-lg shadow-sm p-4 flex justify-between items-center border-b border-gray-200 sticky top-0 z-30">
-                <div className="flex items-center gap-3"> {/* Increased gap */}
+                <div className="flex items-center gap-3">
                     <div 
                         onClick={() => router.push('/')} 
                         className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-md cursor-pointer hover:shadow-lg transition-all duration-200"
-                    > {/* Style update & made clickable */}
+                    >
                         <span className="text-xl font-bold text-white">CC</span>
                     </div>
-                    <h1 className="text-xl font-semibold text-gray-800">CONFIDENTIAL COPILOT</h1> {/* Style update */}
+                    <h1 className="text-xl font-semibold text-gray-800">CONFIDENTIAL COPILOT</h1>
                 </div>
                 <div className="flex items-center gap-4">
-                    {/* Search bar removed */}
                     <div className="relative">
                         <Button
                             variant="outline"
                             size="sm"
-                            className="rounded-full hover:bg-gray-200/70 p-2" // Style update
+                            className="rounded-full hover:bg-gray-200/70 p-2"
                             onClick={() => setShowReminders(!showReminders)}
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
@@ -141,13 +139,13 @@ export default function DashboardPage() {
                         </Button>
                         <RemindersDropdown open={showReminders} onClose={() => setShowReminders(false)} />
                     </div>
-                      {/* Enhanced user profile section */}
                     <div className="flex items-center gap-3 border-l pl-4 border-gray-200">
                         {user && (
                             <div className="text-right">
                                 <p className="text-sm font-medium text-gray-800">{user.email}</p>
                             </div>
-                        )}                        <div className="relative cursor-pointer" onClick={() => setShowUserDropdown(!showUserDropdown)}>
+                        )}
+                        <div className="relative cursor-pointer" onClick={() => setShowUserDropdown(!showUserDropdown)}>
                             <div className="h-10 w-10 bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-full flex items-center justify-center text-lg font-semibold shadow-sm hover:shadow-md transition-all duration-200 border-2 border-white">
                                 {user?.email?.charAt(0).toUpperCase() || 'U'}
                             </div>
@@ -157,10 +155,10 @@ export default function DashboardPage() {
                 </div>
             </header>
 
-            {/* Main Content */}
-            <div className="flex flex-1">
+            {/* Main Content - This is the scrollable container */}
+            <div className="flex-1 overflow-auto">
                 {/* Main Dashboard */}
-                <main className="flex-1 p-8 overflow-y-auto"> {/* Added overflow handling */}
+                <main className="w-full p-8 pb-20 md:pb-24"> {/* Added more bottom padding */}
                     {/* Welcome Card */}
                     <div className="mb-10"> {/* Increased margin-bottom */}
                         <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200/80 hover:shadow-xl transition-all duration-300"> {/* Style update */}

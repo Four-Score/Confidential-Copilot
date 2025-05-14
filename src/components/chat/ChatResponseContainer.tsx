@@ -27,11 +27,12 @@ export const ChatResponseContainer: React.FC<ChatResponseContainerProps> = ({
   return (
     <div className="w-full space-y-2">
       {/* Assistant message */}
-      <div className="flex">
-        {/* Avatar */}
-        <div className="flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center bg-gray-300 mr-2">
-          <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 16M5 16V9.104m14.8 6.196V9.104" />
+      <div className="flex">        {/* Avatar */}        <div className="flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center bg-blue-100 mr-2">
+          <svg className="w-5 h-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="9"></circle>
+            <path d="M9 9h.01"></path>
+            <path d="M15 9h.01"></path>
+            <path d="M8 13h8a4 4 0 0 1-8 0z"></path>
           </svg>
         </div>
 

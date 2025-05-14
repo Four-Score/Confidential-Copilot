@@ -127,16 +127,21 @@ export default function ProjectsPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       {/* Header with back button and create button */}
-      <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center">
-        <div className="mb-4 sm:mb-0">
+      <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center">        <div className="mb-4 sm:mb-0">
           <Link 
             href="/dashboard" 
-            className="inline-flex items-center text-gray-600 hover:text-blue-600 transition-colors mb-3"
+            className="flex items-center text-blue-600 hover:text-blue-800 transition-colors group bg-white border border-gray-200 hover:border-blue-300 rounded-lg px-4 py-2 shadow-sm hover:shadow-md mb-3"
           >
-            <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              className="h-5 w-5 mr-2 group-hover:-translate-x-1 transition-transform duration-200" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            Back to Dashboard
+            <span className="font-medium">Back to Dashboard</span>
           </Link>
           <h1 className="text-3xl font-bold text-gray-800">My Projects</h1>
         </div>

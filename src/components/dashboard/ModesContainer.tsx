@@ -14,7 +14,7 @@ interface ModesContainerProps {
 
 export const ModesContainer: React.FC<ModesContainerProps> = ({ modes }) => {
   return (
-    <div className="w-full bg-transparent">
+    <div className="w-full bg-transparent mb-16"> {/* Increased bottom margin for better spacing */}
       <h2 className="font-semibold text-2xl mb-8 text-gray-700 flex items-center">
         <span className="mr-3 text-blue-600">
           <svg
