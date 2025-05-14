@@ -111,7 +111,7 @@ export default function DashboardPage() {
         }
     ];
     return (
-        <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-100 to-slate-100"> {/* Updated background */}
+        <div className="h-screen flex flex-col overflow-hidden bg-gradient-to-br from-gray-100 to-slate-100"> {/* Fixed height and eliminated scroll */}
             {/* Header */}
             <header className="bg-white/95 backdrop-blur-lg shadow-sm p-4 flex justify-between items-center border-b border-gray-200 sticky top-0 z-30">
                 <div className="flex items-center gap-3"> {/* Increased gap */}
@@ -147,12 +147,10 @@ export default function DashboardPage() {
                             <div className="text-right">
                                 <p className="text-sm font-medium text-gray-800">{user.email}</p>
                             </div>
-                        )}
-                        <div className="relative cursor-pointer" onClick={() => setShowUserDropdown(!showUserDropdown)}>
+                        )}                        <div className="relative cursor-pointer" onClick={() => setShowUserDropdown(!showUserDropdown)}>
                             <div className="h-10 w-10 bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-full flex items-center justify-center text-lg font-semibold shadow-sm hover:shadow-md transition-all duration-200 border-2 border-white">
                                 {user?.email?.charAt(0).toUpperCase() || 'U'}
                             </div>
-                            <div className="absolute -bottom-1 -right-1 h-3 w-3 bg-green-500 rounded-full border-2 border-white"></div>
                             <UserDropdown open={showUserDropdown} onClose={() => setShowUserDropdown(false)} />
                         </div>
                     </div>
@@ -162,7 +160,7 @@ export default function DashboardPage() {
             {/* Main Content */}
             <div className="flex flex-1">
                 {/* Main Dashboard */}
-                <main className="flex-1 p-8"> {/* Updated padding, removed conditional margin */}
+                <main className="flex-1 p-8 overflow-y-auto"> {/* Added overflow handling */}
                     {/* Welcome Card */}
                     <div className="mb-10"> {/* Increased margin-bottom */}
                         <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200/80 hover:shadow-xl transition-all duration-300"> {/* Style update */}
