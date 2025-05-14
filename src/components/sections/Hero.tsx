@@ -12,16 +12,21 @@ export function Hero() {
         <div className="absolute -bottom-32 left-1/4 w-96 h-96 bg-cyan-400 rounded-full filter blur-3xl"></div>
       </div>
       
-      <div className="max-w-7xl mx-auto w-full z-10 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center py-12">        <div className="flex flex-col space-y-8 text-center lg:text-left px-4">          <div>            <h2 className="text-sm sm:text-base uppercase tracking-widest text-white font-semibold mb-2 drop-shadow-sm bg-blue-900/50 inline-block px-3 py-1 rounded-full">
-              Security by Design • Zero-Trust Architecture</h2><h1 className="text-4xl sm:text-5xl md:text-6xl font-bold leading-tight tracking-tighter mb-4">
-              Secure Gen AI for Your <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-blue-700 drop-shadow-md">Confidential Data</span>
-            </h1><p className="text-lg sm:text-xl text-gray-100 max-w-2xl mx-auto lg:mx-0 text-shadow">
+      <div className="max-w-7xl mx-auto w-full z-10 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center py-16 md:py-24">
+        <div className="flex flex-col space-y-10 text-center lg:text-left px-4">
+          <div>
+            <h2 className="text-xs sm:text-sm uppercase tracking-wider text-white font-medium mb-3 bg-white/5 inline-block px-3 py-1 rounded-full">
+              Security by Design • Zero-Trust Architecture</h2>
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold leading-tight tracking-tight mb-6">
+              Secure Gen AI for Your <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-blue-600 drop-shadow-md">Confidential Data</span>
+            </h1>
+            <p className="text-lg sm:text-xl text-gray-200 max-w-2xl mx-auto lg:mx-0 text-shadow-sm">
               Leverage the power of AI while keeping your data completely private and secure.
               Zero-trust architecture ensures your information never leaves your control.
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mt-2">
             <Link href="/sign-up">
               <Button size="lg" className="px-8 py-6 text-lg font-medium shadow-lg shadow-blue-900/20">
                 Get Started
@@ -34,17 +39,17 @@ export function Hero() {
             </Link>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-6 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="bg-green-500 rounded-full w-3 h-3"></div>
+          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-x-10 gap-y-6 text-sm">
+            <div className="flex items-center gap-2.5">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-400 flex-shrink-0"><path d="M20 6 9 17l-5-5"></path></svg>
               <span>Client-side Encryption</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="bg-green-500 rounded-full w-3 h-3"></div>
+            <div className="flex items-center gap-2.5">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-400 flex-shrink-0"><path d="M20 6 9 17l-5-5"></path></svg>
               <span>Zero Knowledge Architecture</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="bg-green-500 rounded-full w-3 h-3"></div>
+            <div className="flex items-center gap-2.5">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-400 flex-shrink-0"><path d="M20 6 9 17l-5-5"></path></svg>
               <span>Searchable Encryption</span>
             </div>
           </div>

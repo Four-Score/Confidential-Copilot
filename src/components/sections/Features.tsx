@@ -44,7 +44,7 @@ export function Features() {
     {
       icon: <FileText className="w-6 h-6 text-blue-600" />,
       title: "Document Mode",
-      description: "Process and interact with your document collection with full encryption and privacy."
+      description: "Process and interact with your document collection."
     },
     {
       icon: (

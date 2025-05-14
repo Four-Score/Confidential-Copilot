@@ -31,7 +31,7 @@ export default function DashboardPage() {
 
     // Navigate to YouTube summarizer page
     const navigateToYouTubeSummarizer = () => {
-        router.push('/dashboard/youtube-summarizer'); // Assuming this is the route
+        router.push('/dashboard/youtube-transcript'); // Assuming this is the route
     };
 
     // Define modes data for the cards
