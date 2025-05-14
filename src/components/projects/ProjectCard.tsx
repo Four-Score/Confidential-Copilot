@@ -44,14 +44,17 @@ export default function ProjectCard({ project, onDelete }: ProjectCardProps) {
   };
   
   return (
-    <Link href={`/projects/${project.id}`} className="block">
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition duration-200">
+    <Link href={`/projects/${project.id}`} className="block group">
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 group-hover:shadow-lg group-hover:border-blue-200 transition-all duration-300 relative overflow-hidden h-full flex flex-col">
+        {/* Card accent color top bar */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+        
         <div className="flex justify-between items-start mb-4">
-          <h3 className="text-xl font-semibold text-gray-800 truncate">{project.name}</h3>
+          <h3 className="text-xl font-semibold text-gray-800 truncate group-hover:text-blue-700 transition-colors">{project.name}</h3>
           <button
             onClick={handleDelete}
             disabled={isDeleting}
-            className="text-gray-400 hover:text-red-500 transition duration-200"
+            className="text-gray-400 hover:text-red-500 transition duration-200 p-1.5 rounded-full hover:bg-red-50 opacity-70 group-hover:opacity-100"
             aria-label="Delete project"
           >
             {isDeleting ? (
@@ -81,7 +84,7 @@ export default function ProjectCard({ project, onDelete }: ProjectCardProps) {
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth={2}
+                  strokeWidth="2"
                   d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                 />
               </svg>
@@ -90,15 +93,36 @@ export default function ProjectCard({ project, onDelete }: ProjectCardProps) {
         </div>
         
         {project.description && (
-          <p className="text-gray-600 mb-4 line-clamp-2">{project.description}</p>
+          <p className="text-gray-600 mb-5 line-clamp-2 text-sm">{project.description}</p>
         )}
         
-        <div className="flex justify-between items-center text-sm text-gray-500">
-          <span>Created {formatDate(project.created_at)}</span>
+        {/* Flexible space to push the footer to the bottom */}
+        <div className="flex-grow"></div>
+        
+        {/* Project stats */}
+        <div className="mt-auto">
+          {/* Divider */}
+          <div className="border-t border-gray-100 pt-3 mb-3"></div>
+
+          
+          <div className="flex justify-between items-center text-xs text-gray-500 mt-3">
+            <span className="flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              {formatDate(project.created_at)}
+            </span>
+            
+            <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium group-hover:bg-blue-100 transition-colors">
+              View Project →
+            </div>
+          </div>
         </div>
         
         {error && (
-          <div className="mt-3 text-sm text-red-500">{error}</div>
+          <div className="mt-4 p-2 bg-red-50 border border-red-100 rounded text-red-600 text-sm">
+            {error}
+          </div>
         )}
       </div>
     </Link>
