@@ -209,10 +209,15 @@ export const SelectableDocumentCard: React.FC<SelectableDocumentCardProps> = ({
           <h3 className="text-lg font-medium text-gray-900 truncate">
             {document.type === 'youtube' && document.url ? (
               <a
-                href={document.url}
+                href={
+                  // Ensure the URL is a valid YouTube link
+                  document.url.startsWith('http')
+                    ? document.url
+                    : `https://www.youtube.com/watch?v=${document.metadata?.videoId || ''}`
+                }
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 underline"
+                className="text-blue-600 font-semibold hover:underline"
               >
                 View on YouTube
               </a>
