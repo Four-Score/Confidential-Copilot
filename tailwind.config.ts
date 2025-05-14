@@ -80,17 +80,37 @@ const config: Config = {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-      },
-      typography: {
+      },      typography: {
         DEFAULT: {
           css: {
             maxWidth: "100%",
           },
         },
       },
+      textShadow: {
+        DEFAULT: '0 2px 4px rgba(0,0,0,0.1)',
+        sm: '0 1px 2px rgba(0,0,0,0.05)',
+        md: '0 4px 6px rgba(0,0,0,0.1)',
+        lg: '0 10px 15px rgba(0,0,0,0.1)',
+      },
     },
   },
-  plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")],
+  plugins: [
+    require("tailwindcss-animate"),
+    require("@tailwindcss/typography"),
+    function({ addUtilities, theme }: { addUtilities: (utilities: Record<string, Record<string, string>>) => void, theme: (path: string, defaultValue?: Record<string, string>) => Record<string, string> }) {
+      const textShadowUtilities: Record<string, { textShadow: string }> = {};
+      const textShadow = theme('textShadow', {});
+      
+      Object.entries(textShadow).forEach(([key, value]) => {
+        textShadowUtilities[`.text-shadow${key === 'DEFAULT' ? '' : `-${key}`}`] = {
+          textShadow: value,
+        };
+      });
+      
+      addUtilities(textShadowUtilities);
+    },
+  ],
 }
 
 export default config
