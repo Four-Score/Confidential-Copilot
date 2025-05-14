@@ -108,7 +108,16 @@ export const RemindersDropdown: React.FC<RemindersDropdownProps> = ({ open, onCl
         marginTop: window.innerWidth < 640 ? 0 : undefined,
       }}
     >
-      <div className="p-3 border-b font-semibold text-gray-700">Reminders</div>
+      {/* Close (cross) button at the top-right corner */}
+      <button
+        className="absolute top-2 right-2 text-gray-400 hover:text-red-600 text-2xl font-bold focus:outline-none"
+        aria-label="Close reminders"
+        onClick={onClose}
+        type="button"
+      >
+        &times;
+      </button>
+      <div className="p-3 border-b font-semibold text-gray-700">To-Do List</div>
       <div className="max-h-64 overflow-y-auto">
         {loading ? (
           <div className="p-4 text-center text-gray-500">Loading...</div>
@@ -118,9 +127,12 @@ export const RemindersDropdown: React.FC<RemindersDropdownProps> = ({ open, onCl
           reminders.map((reminder, idx) => {
             const action = parseActionItem(reminder.action_item);
             return (
-              <div key={reminder.id || idx} className="p-3 border-b last:border-b-0 flex justify-between items-center">
+              <div
+                key={reminder.id || idx}
+                className="bg-white rounded-lg shadow p-4 mb-3 flex justify-between items-center border border-gray-100"
+              >
                 <div>
-                  <div className="font-medium">{action.task || 'Untitled Task'}</div>
+                  <div className="font-medium text-gray-800">{action.task || 'Untitled Task'}</div>
                   {action.assignee && (
                     <div className="text-xs text-gray-500">Assignee: {action.assignee}</div>
                   )}
