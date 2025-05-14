@@ -66,8 +66,7 @@ const config: Config = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
-      },
-      keyframes: {
+      },      keyframes: {
         "accordion-down": {
           from: { height: "0" },
           to: { height: "var(--radix-accordion-content-height)" },
@@ -76,11 +75,17 @@ const config: Config = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        "pulse-slow": {
+          "0%, 100%": { opacity: "0.85" },
+          "50%": { opacity: "0.6" }
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-      },      typography: {
+        "pulse-slow": "pulse-slow 8s ease-in-out infinite",
+        "pulse-slower": "pulse-slow 12s ease-in-out infinite",
+      },typography: {
         DEFAULT: {
           css: {
             maxWidth: "100%",
