@@ -1,12 +1,12 @@
-// src/content.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import './styles.css';
 import EmailPreview from './ui/EmailPreview';
+import ResponseEditor from './ui/ResponseEditor';
 import { IEmailData, IEmailEntities } from './interfaces/IEmailModels';
 import GmailApiService from './services/GmailApiService';
 import EntityAnalyzer from './core/EntityAnalyzer';
-import { Summarizer } from './utils/summarizer'; // <-- Import summarizer
+import { Summarizer } from './utils/summarizer';
 
 const createContainer = (): HTMLElement => {
   const existing = document.getElementById('email-assistant-container');
@@ -29,33 +29,57 @@ const analyzeCurrentEmail = async (): Promise<void> => {
       return;
     }
 
-    // Summarize the email body immediately
     const summary = await Summarizer.summarize(emailData.body || '');
-
     const entityAnalyzer = EntityAnalyzer.getInstance();
     const entities = entityAnalyzer.analyzeEmail(emailData);
 
-    renderEmailPreview(emailData, entities, summary);
+    renderModals(emailData, entities, summary);
   } catch (error) {
     console.error('Error analyzing email:', error);
   }
 };
 
-const renderEmailPreview = (emailData: IEmailData, entities: IEmailEntities, summary: string): void => {
+const renderModals = (emailData: IEmailData, entities: IEmailEntities, summary: string): void => {
   const container = createContainer();
   const root = ReactDOM.createRoot(container);
 
+  const App = () => {
+    const [showPreview, setShowPreview] = useState(true);
+    const [showResponseEditor, setShowResponseEditor] = useState(false);
+
+    const handleClose = () => {
+      root.unmount();
+      container.remove();
+    };
+
+    return (
+      <>
+        {showPreview && (
+          <EmailPreview
+            emailData={emailData}
+            entities={entities}
+            emailSummary={summary}
+            onClose={handleClose}
+            onGenerateResponse={() => {
+              setShowResponseEditor(true);
+              setShowPreview(false);
+            }}
+          />
+        )}
+
+        {showResponseEditor && (
+          <ResponseEditor
+            emailSummary={summary}
+            onClose={handleClose}
+          />
+        )}
+      </>
+    );
+  };
+
   root.render(
     <React.StrictMode>
-      <EmailPreview 
-        emailData={emailData}
-        entities={entities}
-        emailSummary={summary} // Pass summary!
-        onClose={() => {
-          root.unmount();
-          container.remove();
-        }}
-      />
+      <App />
     </React.StrictMode>
   );
 };
@@ -68,7 +92,7 @@ const addFloatingActionButton = (): void => {
   button.className = 'email-assistant-fab';
 
   const img = document.createElement('img');
-  img.src = chrome.runtime.getURL('assets/cc-logo.png'); // Ensure this image exists in your /assets folder
+  img.src = chrome.runtime.getURL('assets/cc-logo.png');
   img.alt = 'CC Logo';
   img.style.width = '100%';
   img.style.height = '100%';
@@ -86,8 +110,6 @@ const addFloatingActionButton = (): void => {
 
   document.body.appendChild(button);
 };
-
-
 
 const setupUrlChangeDetection = (): void => {
   let lastUrl = location.href;
@@ -147,6 +169,7 @@ if (document.readyState === 'loading') {
 } else {
   initialize();
 }
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'analyzeCurrentEmail') {
     analyzeCurrentEmail();

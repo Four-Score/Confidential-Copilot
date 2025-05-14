@@ -12,7 +12,6 @@ const ResponseModal: React.FC<ResponseModalProps> = ({ response, onClose, onRege
     <div className="modal-overlay">
       <div className="modal-content">
         <h3 style={{ marginBottom: '1rem' }}>Generated Response</h3>
-
         <div className="response-box">
           {response
             .split('\n')
@@ -21,11 +20,8 @@ const ResponseModal: React.FC<ResponseModalProps> = ({ response, onClose, onRege
               <p key={idx}>{line}</p>
             ))}
         </div>
-
         <div className="modal-actions">
-          <button onClick={onClose} className="secondary-button">
-            Close
-          </button>
+          <button onClick={onClose} className="secondary-button">Close</button>
           <button onClick={onRegenerate} className="main-button" disabled={loading}>
             {loading ? 'Regenerating...' : 'Regenerate'}
           </button>

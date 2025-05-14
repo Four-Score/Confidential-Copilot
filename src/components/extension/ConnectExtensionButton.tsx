@@ -10,7 +10,6 @@ export default function ConnectExtensionButton() {
 
   return (
     <div className="flex flex-col items-start space-y-2">
-      <p className="text-sm text-gray-600">Connect your browser extension:</p>
       <Button onClick={handleConnect}>Connect to Extension</Button>
     </div>
   );
