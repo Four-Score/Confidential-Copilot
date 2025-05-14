@@ -88,7 +88,18 @@ export async function POST(
       return NextResponse.json({ error: chunkError.message || 'Failed to save chunks' }, { status: 500 });
     }
 
-    return NextResponse.json({ youtubeId: document.id, success: true });
+    // After inserting the document:
+    const { data: fullDoc, error: fetchError } = await supabase
+      .from('v2_documents')
+      .select('*')
+      .eq('id', document.id)
+      .single();
+
+    if (fetchError || !fullDoc) {
+      return NextResponse.json({ error: fetchError?.message || 'Failed to fetch new YouTube document' }, { status: 500 });
+    }
+
+    return NextResponse.json({ youtubeDoc: fullDoc, success: true });
   } catch (error: any) {
     console.error('Error in YouTube ingest route:', error);
     return NextResponse.json(
