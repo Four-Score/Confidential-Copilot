@@ -8,7 +8,7 @@ import { ModesContainer } from '@/components/dashboard/ModesContainer';
 import { useModal } from '@/contexts/ModalContext';
 import { RemindersDropdown } from '@/components/dashboard/RemindersDropdown';
 import { UserDropdown } from '@/components/dashboard/UserDropdown';
-import { useUnreadRemindersCount } from '@/hooks/ReminderCount';
+import { useRemindersCount } from '@/contexts/RemindersCountContext';
 import Image from 'next/image';
 
 export default function DashboardPage() {
@@ -17,7 +17,7 @@ export default function DashboardPage() {
     const { openModal } = useModal();
     const [showReminders, setShowReminders] = useState(false);
     const [showUserDropdown, setShowUserDropdown] = useState(false);
-    const { count, fetchCount } = useUnreadRemindersCount(showReminders);
+    const { count } = useRemindersCount();
 
     // Navigate to the meeting summarizer page
     const navigateToMeetingSummarizer = () => {

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRemindersCount } from '@/contexts/RemindersCountContext';
 
 interface ActionItem {
   task: string;
@@ -24,6 +25,7 @@ export function MeetingResults({
   const [savingIndex, setSavingIndex] = useState<number | null>(null);
   const [successIndex, setSuccessIndex] = useState<number | null>(null);
   const [errorIndex, setErrorIndex] = useState<number | null>(null);
+  const { fetchCount } = useRemindersCount();
 
   // Save action item to reminders
   const handleRemindMeLater = async (item: ActionItem, index: number) => {
@@ -36,11 +38,12 @@ export function MeetingResults({
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          action_item: JSON.stringify(item), // Save as string, or customize as needed
+          action_item: JSON.stringify(item),
         }),
       });
       if (res.ok) {
         setSuccessIndex(index);
+        await fetchCount();
       } else {
         setErrorIndex(index);
       }
