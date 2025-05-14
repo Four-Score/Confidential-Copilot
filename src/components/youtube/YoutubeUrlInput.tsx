@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import ErrorDisplay from '@/components/uploads/ErrorDisplay';
 import ProgressBar from '@/components/uploads/ProgressBar';
 
@@ -22,77 +22,23 @@ export default function YoutubeUrlInput({
   error
 }: YoutubeUrlInputProps) {
   const [url, setUrl] = useState('');
-  const [isValidating, setIsValidating] = useState(false);
-  const [validationError, setValidationError] = useState<string | null>(null);
 
-  // Handle URL input change
-  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setUrl(e.target.value);
-    if (validationError) {
-      setValidationError(null);
-    }
-  };
-
-  // Validate YouTube URL
-  const validateYoutubeUrl = (url: string) => {
-    // Basic YouTube URL validation
-    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/user\/\w+\/\w+\/|youtube\.com\/\w+\/\w+\/|youtube\.com\/playlist\?list=)([a-zA-Z0-9_-]{11}|\w+)/;
-    
-    if (!youtubeRegex.test(url)) {
-      return {
-        isValid: false,
-        message: 'Please enter a valid YouTube URL'
-      };
-    }
-    
-    return {
-      isValid: true,
-      message: ''
-    };
-  };
-
-  // Handle URL submission
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isLoading) onUrlSubmit(url);
+  };
 
-    // Basic format validation
-    if (!url.trim()) {
-      setValidationError('Please enter a YouTube URL');
-      return;
-    }
-
-    try {
-      // Check if URL has http/https prefix
-      let urlToValidate = url;
-      if (!/^https?:\/\//i.test(url)) {
-        urlToValidate = `https://${url}`;
-        setUrl(urlToValidate);
-      }
-
-      setIsValidating(true);
-      
-      // Validate YouTube URL
-      const validation = validateYoutubeUrl(urlToValidate);
-      
-      if (!validation.isValid) {
-        setValidationError(validation.message || 'Invalid YouTube URL');
-      } else {
-        onUrlSubmit(urlToValidate);
-      }
-    } catch (err) {
-      setValidationError('Error validating YouTube URL');
-      console.error('URL validation error:', err);
-    } finally {
-      setIsValidating(false);
-    }
-  }, [url, onUrlSubmit]);
+  const handleCancel = () => {
+    setUrl(''); // Clear the input field
+    onCancel(); // Call parent cancel logic
+  };
 
   return (
     <div className="bg-white shadow-lg rounded-lg p-6 mb-8">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold text-gray-900">Add YouTube Content</h2>
         <button
-          onClick={onCancel}
+          onClick={handleCancel}
           className="text-gray-500 hover:text-gray-700"
           disabled={isLoading}
         >
@@ -101,7 +47,7 @@ export default function YoutubeUrlInput({
           </svg>
         </button>
       </div>
-      
+
       <div className="space-y-6">
         {!isLoading ? (
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -111,37 +57,29 @@ export default function YoutubeUrlInput({
                 id="youtube-url"
                 placeholder="Enter YouTube URL (e.g., https://www.youtube.com/watch?v=VIDEO_ID)"
                 value={url}
-                onChange={handleUrlChange}
+                onChange={e => setUrl(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                disabled={isValidating}
+                disabled={isLoading}
               />
-              {isValidating && (
-                <div className="absolute right-3 top-3">
-                  <div className="animate-spin h-5 w-5 border-2 border-blue-500 rounded-full border-t-transparent"></div>
-                </div>
-              )}
             </div>
-            
-            {validationError && (
-              <ErrorDisplay error={validationError} />
-            )}
-            
+
+            {/* Show validation error or backend error below the input */}
+            {error && <ErrorDisplay error={error} />}
+
             <div className="flex justify-end space-x-3 pt-4">
               <button
                 type="button"
-                onClick={onCancel}
+                onClick={handleCancel}
                 className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={isValidating}
-                className={`px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-                  isValidating ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                disabled={isLoading}
               >
-                {isValidating ? 'Validating...' : 'Submit'}
+                Submit
               </button>
             </div>
           </form>

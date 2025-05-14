@@ -57,7 +57,7 @@ export default function YoutubePreview({
               onClick={onBack}
               className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
             >
-              Back to Project
+              Cancel
             </button>
             <button
               onClick={onConfirm}
