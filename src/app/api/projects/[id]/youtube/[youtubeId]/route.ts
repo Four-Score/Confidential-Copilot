@@ -29,3 +29,26 @@ export async function DELETE(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+export async function GET(request: Request, context: any) {
+  try {
+    const { id: projectId, youtubeId } = context.params;
+    const supabase = await createClient();
+
+    // Fetch the YouTube document by ID and project
+    const { data, error } = await supabase
+      .from('v2_documents')
+      .select('*')
+      .eq('id', youtubeId)
+      .eq('project_id', projectId)
+      .single();
+
+    if (error || !data) {
+      return NextResponse.json({ error: error?.message || 'YouTube document not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(data);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Failed to fetch YouTube document' }, { status: 500 });
+  }
+}
