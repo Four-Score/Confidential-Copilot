@@ -13,8 +13,15 @@ import { Document, UnencryptedDocument } from '@/types/document';
 import { useKeyManagement } from '@/services/keyManagement';
 import { useDocumentProcessor } from '@/hooks/useDocumentProcessor';
 import YoutubePreview from '@/components/youtube/YoutubePreview';
-import { processYoutubeTranscript } from '@/lib/clientProcessing';
-
+// Add this helper function at the top (inside or outside your component)
+async function fetchWithRetry(url: string, options: RequestInit = {}, retries: number = 3, delay: number = 500) {
+  for (let i = 0; i < retries; i++) {
+    const res = await fetch(url, options);
+    if (res.ok) return await res.json();
+    if (res.status !== 404 || i === retries - 1) throw new Error('Failed to fetch new YouTube document');
+    await new Promise(r => setTimeout(r, delay));
+  }
+}
 
 export default function ProjectPage() {
   const params = useParams();
@@ -38,6 +45,9 @@ export default function ProjectPage() {
   const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
   const [isYoutubeIngesting, setIsYoutubeIngesting] = useState(false);
   const [youtubeDocs, setYoutubeDocs] = useState<UnencryptedDocument[]>([]);
+  const [youtubeSuccess, setYoutubeSuccess] = useState(false);
+  const [uploadedYoutube, setUploadedYoutube] = useState<UnencryptedDocument | null>(null);
+  const [youtubeInputError, setYoutubeInputError] = useState<string | null>(null);
   // Get encryption service
   const { 
     service: encryptionService, 
@@ -49,6 +59,7 @@ export default function ProjectPage() {
   const { 
     processFile, 
     processWebsiteUrl, 
+    processYoutubeTranscript,
     isProcessing,
     progress,
     status,
@@ -222,12 +233,15 @@ export default function ProjectPage() {
   };
 
   const handleYoutubeInputCancel = () => {
-    setShowYoutubeInput(false);
+    setShowYoutubeInput(true);
+    setYoutubeTranscript(null);
     setCurrentUrl(null);
+    setYoutubeInputError(null);
     reset();
   };
 
   const handleYoutubeUrlSubmit = async (url: string) => {
+    setYoutubeInputError(null); // clear previous error
     try {
       const response = await fetch(`/api/projects/${projectId}/youtube-transcript`, {
         method: 'POST',
@@ -235,12 +249,23 @@ export default function ProjectPage() {
         body: JSON.stringify({ video_url: url }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to fetch transcript');
+      if (!response.ok) {
+        if (
+          data.error &&
+          (data.error.includes('No transcript available') ||
+           data.error.includes('Transcript is disabled'))
+        ) {
+          setYoutubeInputError('This YouTube video does not have a transcript available.');
+        } else {
+          setYoutubeInputError(data.error || 'Failed to fetch transcript');
+        }
+        return;
+      }
       setYoutubeTranscript(data.transcript);
       setYoutubeVideoId(data.videoId);
       setShowYoutubeInput(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch transcript');
+      setYoutubeInputError('Failed to fetch transcript');
     }
   };
 
@@ -258,15 +283,16 @@ export default function ProjectPage() {
       if (!result.success) {
         throw new Error(result.error || 'Failed to ingest YouTube data');
       }
-      // Optionally refresh documents or show a success message
+      // Use the full document returned by the API
+      const youtubeDoc = result.youtubeDoc;
+      setUploadedYoutube(youtubeDoc);
+      setYoutubeSuccess(true);
+      setYoutubeDocs(prev => [youtubeDoc, ...prev]);
       setYoutubeTranscript(null);
       setYoutubeVideoId(null);
-      // Optionally, refresh the project data to show the new document
-      // await fetchProjectData();
-      handleBackToProject();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to ingest YouTube data');
-    }finally {
+    } finally {
       setIsYoutubeIngesting(false);
     }
   };
@@ -297,8 +323,10 @@ export default function ProjectPage() {
     setShowWebsiteInput(false);
     setUploadSuccess(false);
     setWebsiteSuccess(false);
+    setYoutubeSuccess(false);
     setUploadedDocument(null);
     setUploadedWebsite(null);
+    setUploadedYoutube(null);
     setCurrentUrl(null);
     reset();
   };
@@ -502,7 +530,7 @@ export default function ProjectPage() {
             isLoading={isProcessing}
             progress={progress}
             currentStep={status}
-            error={processingError}
+            error={youtubeInputError}
           />
         </div>
       </div>
@@ -518,13 +546,47 @@ export default function ProjectPage() {
           <YoutubePreview
             videoId={youtubeVideoId}
             transcript={youtubeTranscript}
-            onBack={handleBackToProject}
+            onBack={handleYoutubeInputCancel} 
             onConfirm={handleYoutubeIngest}
             isProcessing={isYoutubeIngesting || isProcessing}
             progress={progress}
             status={status}
             error={processingError}
           />
+        </div>
+      </div>
+    );
+  }
+
+  // Show success message for YouTube ingestion
+  if (youtubeSuccess) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <ProjectHeader project={project} />
+        <div className="bg-white shadow-lg rounded-lg p-6 mb-8">
+          <div className="text-center py-6">
+            <div className="mb-4">
+              <svg className="mx-auto h-12 w-12 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              YouTube Video Ingested Successfully!
+            </h3>
+            <p className="text-gray-600 mb-6">
+              {uploadedYoutube?.metadata?.title || "YouTube video"} has been processed and added to your project.
+            </p>
+            <button
+              onClick={() => {
+                setYoutubeSuccess(false);
+                setUploadedYoutube(null);
+                handleBackToProject();
+              }}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Back to Project
+            </button>
+          </div>
         </div>
       </div>
     );

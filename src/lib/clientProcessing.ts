@@ -83,6 +83,7 @@ export interface YoutubeProcessingOptions {
 
 export interface YoutubeProcessingResult {
   youtubeId: string;
+  youtubeDoc?: any;
   success: boolean;
   error?: string;
   metadata?: {
@@ -671,11 +672,13 @@ export async function processYoutubeTranscript(
       };
     }
 
+    // ...after the POST to /youtube-ingest
     const data = await response.json();
     await reportProgress('completed', 100, 'YouTube transcript processed');
 
     return {
-      youtubeId: data.id || videoId,
+      youtubeId: data.youtubeDoc?.id || videoId,
+      youtubeDoc: data.youtubeDoc,
       success: true,
       metadata: {
         chunkCount: chunksWithEmbeddings.length,

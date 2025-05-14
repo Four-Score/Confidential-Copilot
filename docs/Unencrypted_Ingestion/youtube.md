@@ -174,3 +174,87 @@ This ensures YouTube docs are removed from the v2_documents table without affect
 
 # Card Rendering Logic:
 The frontend now renders YouTube, website, and document cards using type checks, ensuring the correct card and delete handler are used for each document type.
+
+
+# YouTube Transcript Ingestion Flow
+
+## Overview
+
+This document describes the YouTube transcript ingestion feature and how it is implemented to match the website ingestion flow. It also confirms that other ingestion types (PDF, website, meeting transcript) are not affected by these changes.
+
+---
+
+## How It Works
+
+### 1. **User Flow**
+- The user clicks "YouTube Content" and submits a YouTube URL.
+- The transcript is fetched and displayed for confirmation.
+- On confirmation, the transcript is chunked, embedded, and stored in the database.
+- Progress and status are shown throughout the process.
+- After ingestion, a success message is shown and the new YouTube document appears instantly in the project.
+
+### 2. **Progress Bar and Status**
+- The progress bar and step/status text are updated in real time using the `useDocumentProcessor` hook.
+- Progress events are emitted during chunking, embedding, and storing, just like website ingestion.
+
+### 3. **Document List Update**
+- After successful ingestion, the full YouTube document is returned from the backend and added to the `youtubeDocs` state.
+- The UI updates instantly, just like for websites.
+
+### 4. **Error Handling**
+- If ingestion fails, an error message is shown.
+- If the document is not immediately available, the frontend no longer retries fetching by ID, as the full document is returned directly.
+
+---
+
+## Code Structure
+
+- **Frontend Handler:**  
+  `src/app/projects/[id]/page.tsx`  
+  Handles state, progress, and updates the document list.
+
+- **Processing Logic:**  
+  `src/lib/clientProcessing.ts`  
+  Handles chunking, embedding, and API calls for YouTube ingestion.
+
+- **Backend API:**  
+  `src/app/api/projects/[id]/youtube-ingest/route.ts`  
+  Inserts the YouTube document and returns the full document.
+
+- **UI Components:**  
+  - `YoutubeUrlInput.tsx`  
+  - `YoutubePreview.tsx`  
+  - `ProgressBar.tsx`  
+  All use the same props and logic as website ingestion for a consistent experience.
+
+---
+
+## Parity with Website Ingestion
+
+| Feature                | Website Ingestion | YouTube Ingestion |
+|------------------------|-------------------|-------------------|
+| Progress Bar           | ✔️                | ✔️                |
+| Status/Step Text       | ✔️                | ✔️                |
+| Instant List Update    | ✔️                | ✔️                |
+| Confirmation UI        | ✔️                | ✔️                |
+
+---
+
+## Other Functionality
+
+**No other ingestion types or project features are affected by these changes.**
+- PDF, website, and meeting transcript ingestion continue to work as before.
+- Only the YouTube ingestion flow was updated for parity and reliability.
+
+---
+
+## Troubleshooting
+
+- If you see a 404 after ingestion, ensure the backend returns the full document, not just the ID.
+- For very short transcripts, the progress bar may jump quickly due to fast processing.
+
+---
+
+## Questions?
+
+If you have further questions or want to extend this flow to other document types, please ask!
