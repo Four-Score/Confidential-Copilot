@@ -212,7 +212,7 @@ export default function MeetingSummarizerPage() {
           <div className="flex items-center gap-2 mt-1">
             <span className="h-4 w-1 bg-blue-400 rounded-full"></span>
             <span className="text-xs text-blue-700 font-medium">
-              Audio transcript support coming soon!
+              Meeting transcript extension coming soon!
             </span>
           </div>
         </div>
