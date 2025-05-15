@@ -1,3 +1,15 @@
+// PATCH: Make fetch requests look like a real browser to YouTube
+const originalFetch = globalThis.fetch;
+globalThis.fetch = async (url, options = {}) => {
+  const newHeaders = {
+    ...options.headers,
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+  };
+  return originalFetch(url, { ...options, headers: newHeaders });
+};
+
+
+
 import { NextResponse } from 'next/server';
 import { YoutubeTranscript } from 'youtube-transcript';
 
