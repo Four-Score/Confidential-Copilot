@@ -14,6 +14,7 @@ interface MeetingResultsProps {
   actionItems: ActionItem[] | null;
   onDownloadSummary: () => void;
   onDownloadActionItems: () => void;
+  show: 'summary' | 'action_items';
 }
 
 export function MeetingResults({
@@ -21,16 +22,16 @@ export function MeetingResults({
   actionItems,
   onDownloadSummary,
   onDownloadActionItems,
+  show,
 }: MeetingResultsProps) {
   const [savingIndex, setSavingIndex] = useState<number | null>(null);
-  const [successIndex, setSuccessIndex] = useState<number | null>(null);
+  const [savedIndices, setSavedIndices] = useState<Set<number>>(new Set());
   const [errorIndex, setErrorIndex] = useState<number | null>(null);
   const { fetchCount } = useRemindersCount();
 
   // Save action item to reminders
   const handleRemindMeLater = async (item: ActionItem, index: number) => {
     setSavingIndex(index);
-    setSuccessIndex(null);
     setErrorIndex(null);
     try {
       const res = await fetch('/api/reminders', {
@@ -42,7 +43,7 @@ export function MeetingResults({
         }),
       });
       if (res.ok) {
-        setSuccessIndex(index);
+        setSavedIndices(prev => new Set(prev).add(index));
         await fetchCount();
       } else {
         setErrorIndex(index);
@@ -55,12 +56,11 @@ export function MeetingResults({
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Summary */}
+    <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200/80 hover:shadow-xl transition-all duration-300">
+      {show === 'summary' && summary && (
         <div>
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Meeting Summary</h2>
+            <h2 className="text-xl font-semibold text-gray-800">Meeting Summary</h2>
             <button
               className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
               onClick={onDownloadSummary}
@@ -82,19 +82,43 @@ export function MeetingResults({
               Download
             </button>
           </div>
-          <div className="bg-gray-50 p-4 rounded-md prose max-w-none">
-            {summary.split('\n').map((paragraph, i) => (
-              <p key={i} className="mb-2">
-                {paragraph}
-              </p>
-            ))}
+          <div className="bg-gray-50 p-6 rounded-lg border border-blue-100">
+            {summary.split('\n').map((paragraph, i) => {
+              // Bold headings if line ends with ":"
+              if (
+                paragraph.trim().endsWith(':') &&
+                paragraph.trim().length < 40 // likely a heading
+              ) {
+                return (
+                  <p key={i} className="font-bold text-blue-900 mt-4 mb-2 text-base">
+                    {paragraph}
+                  </p>
+                );
+              }
+              // Bulleted lines
+              if (paragraph.trim().startsWith('-')) {
+                return (
+                  <p key={i} className="ml-4 text-gray-700 mb-1">
+                    <span className="text-blue-500 font-bold mr-2">•</span>
+                    {paragraph.trim().substring(1).trim()}
+                  </p>
+                );
+              }
+              // Regular paragraph
+              return (
+                <p key={i} className="mb-2 text-gray-800">
+                  {paragraph}
+                </p>
+              );
+            })}
           </div>
         </div>
+      )}
 
-        {/* Action Items */}
+      {show === 'action_items' && (
         <div>
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Action Items</h2>
+            <h2 className="text-xl font-semibold text-gray-800">Action Items</h2>
             <button
               className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
               onClick={onDownloadActionItems}
@@ -104,7 +128,7 @@ export function MeetingResults({
                 className="w-4 h-4 mr-1"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
-                viewBox="0 0 24 24"
+                viewBox="0 24 24"
                 stroke="currentColor"
               >
                 <path
@@ -142,22 +166,22 @@ export function MeetingResults({
                   <button
                     className="mt-3 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
                     onClick={() => handleRemindMeLater(item, index)}
-                    disabled={savingIndex === index}
+                    disabled={savingIndex === index || savedIndices.has(index)}
                   >
                     {savingIndex === index
                       ? 'Saving...'
-                      : successIndex === index
+                      : savedIndices.has(index)
                       ? 'Saved!'
                       : errorIndex === index
                       ? 'Error!'
-                      : 'Remind Me Later'}
+                      : '+ To-Do'}
                   </button>
                 </div>
               ))
             )}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
