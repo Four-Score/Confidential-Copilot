@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useUnreadRemindersCount } from '@/hooks/ReminderCount';
+import { useRemindersCount } from '@/contexts/RemindersCountContext';
 
 interface Reminder {
   id: string;
@@ -17,7 +17,7 @@ export const RemindersDropdown: React.FC<RemindersDropdownProps> = ({ open, onCl
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const { fetchCount } = useUnreadRemindersCount(open);
+  const { decrement, fetchCount } = useRemindersCount();
 
   useEffect(() => {
     if (open) {
@@ -54,17 +54,22 @@ export const RemindersDropdown: React.FC<RemindersDropdownProps> = ({ open, onCl
   };
 
   const markAsRead = async (id: string) => {
-    await fetch(`/api/reminders/mark?id=${id}`, { method: 'POST', credentials: 'include' });
+    // Optimistically update UI
     setReminders((prev) =>
       prev.map((r) => (r.id === id ? { ...r, read: true } : r))
     );
-    fetchCount();
+    decrement();
+    await fetch(`/api/reminders/mark?id=${id}`, { method: 'POST', credentials: 'include' });
+    // Optionally re-fetch count for consistency: await fetchCount();
   };
 
   const deleteReminder = async (id: string) => {
-    await fetch(`/api/reminders/${id}/delete`, { method: 'DELETE', credentials: 'include' });
+    // Optimistically update UI
+    const wasUnread = reminders.find((r) => r.id === id && !r.read);
     setReminders((prev) => prev.filter((r) => r.id !== id));
-    fetchCount();
+    if (wasUnread) decrement();
+    await fetch(`/api/reminders/${id}/delete`, { method: 'DELETE', credentials: 'include' });
+    // Optionally re-fetch count for consistency: await fetchCount();
   };
 
   // Helper to parse action_item if it's a string
@@ -85,9 +90,34 @@ export const RemindersDropdown: React.FC<RemindersDropdownProps> = ({ open, onCl
   return (
     <div
       ref={dropdownRef}
-      className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded shadow-lg z-50"
+      className={`
+        absolute sm:right-0 right-2 left-2
+        mt-2
+        w-full sm:w-80 max-w-xs sm:max-w-sm
+        min-w-[200px]
+        bg-white border border-gray-200 rounded shadow-lg z-50
+        sm:p-0 p-1
+        transition-all
+      `}
+      style={{
+        // On mobile, make it fixed at the top for better UX
+        position: window.innerWidth < 640 ? 'fixed' : 'absolute',
+        top: window.innerWidth < 640 ? 70 : undefined,
+        left: window.innerWidth < 640 ? 8 : undefined,
+        right: window.innerWidth < 640 ? 8 : undefined,
+        marginTop: window.innerWidth < 640 ? 0 : undefined,
+      }}
     >
-      <div className="p-3 border-b font-semibold text-gray-700">Reminders</div>
+      {/* Close (cross) button at the top-right corner */}
+      <button
+        className="absolute top-2 right-2 text-gray-400 hover:text-red-600 text-2xl font-bold focus:outline-none"
+        aria-label="Close reminders"
+        onClick={onClose}
+        type="button"
+      >
+        &times;
+      </button>
+      <div className="p-3 border-b font-semibold text-gray-700">To-Do List</div>
       <div className="max-h-64 overflow-y-auto">
         {loading ? (
           <div className="p-4 text-center text-gray-500">Loading...</div>
@@ -97,9 +127,12 @@ export const RemindersDropdown: React.FC<RemindersDropdownProps> = ({ open, onCl
           reminders.map((reminder, idx) => {
             const action = parseActionItem(reminder.action_item);
             return (
-              <div key={reminder.id || idx} className="p-3 border-b last:border-b-0 flex justify-between items-center">
+              <div
+                key={reminder.id || idx}
+                className="bg-white rounded-lg shadow p-4 mb-3 flex justify-between items-center border border-gray-100"
+              >
                 <div>
-                  <div className="font-medium">{action.task || 'Untitled Task'}</div>
+                  <div className="font-medium text-gray-800">{action.task || 'Untitled Task'}</div>
                   {action.assignee && (
                     <div className="text-xs text-gray-500">Assignee: {action.assignee}</div>
                   )}
