@@ -4,6 +4,7 @@ import ProgressBar from '@/components/uploads/ProgressBar';// Adjust the path as
 interface YoutubePreviewProps {
   videoId: string;
   transcript: string;
+  title?: string;
   onBack: () => void;
   onConfirm: () => void;
   isProcessing?: boolean;
@@ -15,6 +16,7 @@ interface YoutubePreviewProps {
 export default function YoutubePreview({
   videoId,
   transcript,
+  title,
   onBack,
   onConfirm,
   isProcessing,
@@ -24,6 +26,10 @@ export default function YoutubePreview({
 }: YoutubePreviewProps) {
   return (
     <div className="bg-white shadow-lg rounded-lg p-6 mb-8">
+      {/* Add title display before the video player */}
+      {title && (
+        <h2 className="text-xl font-bold mb-3">{title}</h2>
+      )}
       <div className="aspect-video rounded-md overflow-hidden bg-gray-100 mb-4">
         <iframe
           width="100%"

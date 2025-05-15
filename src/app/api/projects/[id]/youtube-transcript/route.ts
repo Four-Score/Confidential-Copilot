@@ -63,9 +63,10 @@ export async function POST(request: Request) {
 
     // Extract just the transcript text from the first item
     const transcript = items[0]?.transcript || '';
+    const videoTitle = items[0]?.videoTitle || `YouTube Video ${videoId}`;
     
     // Return both transcript and videoId to maintain API compatibility
-    return NextResponse.json({ transcript, videoId });
+    return NextResponse.json({ transcript, videoId, videoTitle });
   } catch (error: any) {
     console.error('Transcript error:', error);
     

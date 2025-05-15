@@ -51,6 +51,7 @@ export default function ProjectPage() {
   const [youtubeInputError, setYoutubeInputError] = useState<string | null>(null);
   const router = useRouter();
   const [lastYoutubeUrl, setLastYoutubeUrl] = useState<string>('');
+  const [youtubeVideoTitle, setYoutubeVideoTitle] = useState<string | null>(null);
 
   // Get encryption service
   const { 
@@ -274,6 +275,7 @@ export default function ProjectPage() {
       }
       setYoutubeTranscript(data.transcript);
       setYoutubeVideoId(data.videoId);
+      setYoutubeVideoTitle(data.videoTitle);
       setShowYoutubeInput(false);
     } catch (err) {
       setYoutubeInputError('Failed to fetch transcript');
@@ -289,7 +291,7 @@ export default function ProjectPage() {
         youtubeTranscript,
         youtubeVideoId,
         `https://www.youtube.com/watch?v=${youtubeVideoId}`,
-        'Video Title'
+        youtubeVideoTitle || `YouTube Video ${youtubeVideoId}` 
       );
       if (!result.success) {
         throw new Error(result.error || 'Failed to ingest YouTube data');
