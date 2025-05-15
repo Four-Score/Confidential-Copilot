@@ -91,8 +91,8 @@ export const RemindersDropdown: React.FC<RemindersDropdownProps> = ({ open, onCl
     <div
       ref={dropdownRef}
       className={`
-        absolute sm:right-0 right-2 left-2
-        mt-2
+        absolute sm:right-0 
+        mt-6
         w-full sm:w-80 max-w-xs sm:max-w-sm
         min-w-[200px]
         bg-white border border-gray-200 rounded shadow-lg z-50
