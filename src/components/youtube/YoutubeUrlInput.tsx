@@ -11,6 +11,7 @@ interface YoutubeUrlInputProps {
   progress: number;
   currentStep?: string | null;
   error?: string | null;
+  onUrlChange?: (url: string) => void; // <-- Add this
 }
 
 export default function YoutubeUrlInput({
@@ -19,9 +20,15 @@ export default function YoutubeUrlInput({
   isLoading,
   progress,
   currentStep,
-  error
+  error,
+  onUrlChange, // <-- Add this
 }: YoutubeUrlInputProps) {
   const [url, setUrl] = useState('');
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUrl(e.target.value);
+    if (onUrlChange) onUrlChange(e.target.value); // <-- Track input in parent
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +64,7 @@ export default function YoutubeUrlInput({
                 id="youtube-url"
                 placeholder="Enter YouTube URL (e.g., https://www.youtube.com/watch?v=VIDEO_ID)"
                 value={url}
-                onChange={e => setUrl(e.target.value)}
+                onChange={handleInputChange} // <-- Use the new handler
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                 disabled={isLoading}
               />
