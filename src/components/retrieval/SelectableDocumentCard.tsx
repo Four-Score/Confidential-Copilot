@@ -210,7 +210,6 @@ export const SelectableDocumentCard: React.FC<SelectableDocumentCardProps> = ({
             {document.type === 'youtube' && document.url ? (
               <a
                 href={
-                  // Ensure the URL is a valid YouTube link
                   document.url.startsWith('http')
                     ? document.url
                     : `https://www.youtube.com/watch?v=${document.metadata?.videoId || ''}`
@@ -219,7 +218,7 @@ export const SelectableDocumentCard: React.FC<SelectableDocumentCardProps> = ({
                 rel="noopener noreferrer"
                 className="text-blue-600 font-semibold hover:underline"
               >
-                View on YouTube
+                {displayName || document.metadata?.title || 'Untitled YouTube Video'}
               </a>
             ) : (
               displayName
