@@ -46,6 +46,9 @@ export default function YoutubeCard({ document, onDelete }: YoutubeCardProps) {
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
+       <h3 className="p-3 pb-0 text-lg font-semibold text-gray-800 truncate">
+        {document.name || document.metadata?.title || "Untitled YouTube Video"}
+      </h3>
       <div className="p-5">
         <div className="flex justify-between items-start">
           {/* Thumbnail and Date Row */}
