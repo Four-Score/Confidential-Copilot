@@ -189,11 +189,35 @@ export default function ChatPage() {
         }
     };
 
+    const handleBackToDashboard = () => {
+        router.push('/dashboard');
+    };
+
     return (
         <div className="min-h-screen flex flex-col bg-gradient-to-b from-gray-50 to-gray-100">
             {/* Header */}
             <header className="bg-white shadow-md px-6 py-4 flex justify-between items-center border-b border-gray-200 sticky top-0 z-10">
                 <div className="flex items-center space-x-4">
+                    <button
+                        onClick={handleBackToDashboard}
+                        className="flex items-center justify-center p-2 rounded-full hover:bg-gray-100 transition-colors"
+                        aria-label="Back to dashboard"
+                    >
+                        <svg 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            className="h-5 w-5 text-gray-600" 
+                            fill="none" 
+                            viewBox="0 0 24 24" 
+                            stroke="currentColor"
+                        >
+                            <path 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round" 
+                                strokeWidth={2} 
+                                d="M10 19l-7-7m0 0l7-7m-7 7h18" 
+                            />
+                        </svg>
+                    </button>
                     <NewChatButton 
                         hasMessages={messages.length > 0}
                         onNewChat={handleNewChat}
