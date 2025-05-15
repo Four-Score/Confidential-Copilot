@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
 import ProjectHeader from '@/components/projects/ProjectHeader';
 import DocumentList from '@/components/documents/DocumentList';
@@ -48,6 +49,9 @@ export default function ProjectPage() {
   const [youtubeSuccess, setYoutubeSuccess] = useState(false);
   const [uploadedYoutube, setUploadedYoutube] = useState<UnencryptedDocument | null>(null);
   const [youtubeInputError, setYoutubeInputError] = useState<string | null>(null);
+  const router = useRouter();
+  const [lastYoutubeUrl, setLastYoutubeUrl] = useState<string>('');
+
   // Get encryption service
   const { 
     service: encryptionService, 
@@ -233,9 +237,18 @@ export default function ProjectPage() {
   };
 
   const handleYoutubeInputCancel = () => {
-    setShowYoutubeInput(false);
-    setYoutubeInputError(null); // Clear any previous errors
-    // setCurrentUrl(null); // If you are using currentUrl for YouTube, reset it too
+    // If on the input screen and the input is empty, go back to main project page
+    if (showYoutubeInput && !lastYoutubeUrl) {
+      setShowYoutubeInput(false);
+      setYoutubeInputError(null);
+      // Optionally clear other YouTube-related state here if needed
+      return;
+    }
+    // If transcript or video is loaded, just reset YouTube input state
+    setYoutubeTranscript(null);
+    setYoutubeVideoId(null);
+    setShowYoutubeInput(true);
+    setYoutubeInputError(null);
   };
 
   const handleYoutubeUrlSubmit = async (url: string) => {
