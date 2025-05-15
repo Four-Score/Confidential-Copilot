@@ -1,19 +1,7 @@
-// PATCH: Make fetch requests look like a real browser to YouTube
-const originalFetch = globalThis.fetch;
-globalThis.fetch = async (url, options = {}) => {
-  const newHeaders = {
-    ...options.headers,
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
-  };
-  return originalFetch(url, { ...options, headers: newHeaders });
-};
-
-
-
 import { NextResponse } from 'next/server';
-import { YoutubeTranscript } from 'youtube-transcript';
+import { ApifyClient } from 'apify-client';
 
-// Extract YouTube video ID from URL
+// Extract YouTube video ID from URL (keep the existing function)
 function extractVideoId(url: string): string | null {
   if (!url) return null;
   
@@ -48,12 +36,39 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get transcript using youtube-transcript library
-    const transcriptArray = await YoutubeTranscript.fetchTranscript(videoId);
+    // Initialize the Apify client
+    const client = new ApifyClient({
+      token: process.env.APIFY_API_TOKEN || '',
+    });
+
+    // Set up input for the YouTube transcript actor
+    const input = {
+      "startUrls": [
+        video_url
+      ],
+      "language": "Default",
+      "includeTimestamps": "No"
+    };
+
+    // Run the actor and wait for results
+    console.log('Fetching transcript via Apify for video ID:', videoId);
+    const run = await client.actor("dB9f4B02ocpTICIEY").call(input);
     
-    // Combine transcript text
-    const transcriptText = transcriptArray.map(item => item.text).join(' ');
+    // Get results from the dataset
+    const { items } = await client.dataset(run.defaultDatasetId).listItems();
     
+    if (!items || items.length === 0) {
+      console.error('No transcript data received from Apify');
+      return NextResponse.json(
+        { error: 'Transcript not available' },
+        { status: 404 }
+      );
+    }
+
+    // Extract just the transcript text from the first item
+    const transcriptText = items[0]?.transcript || '';
+    
+    // Return the transcript in the same format as the original function
     return NextResponse.json({ transcript: transcriptText });
   } catch (error: any) {
     console.error('Transcript error:', error);
