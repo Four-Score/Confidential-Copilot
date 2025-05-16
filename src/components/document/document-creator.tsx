@@ -1,4 +1,3 @@
-// src\components\document\document-creator.tsx
 "use client"
 
 import type React from "react"
@@ -12,12 +11,16 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Upload, FileText, X, FileUp, Search, Zap, Plus, AlertCircle } from "lucide-react"
+import { Loader2, Upload, FileText, X, FileUp, Search, Zap, Plus, AlertCircle, FolderOpen } from "lucide-react"
 import { templates, sampleDocuments } from "@/lib/sample-data"
 import type { DocumentType, Tool } from "@/lib/types"
 import { generateDocumentContent } from "@/lib/document-generator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { DocumentLoadingScreen } from "@/components/document/document-loading-screen"
+import ReactMarkdown from 'react-markdown'
+import type { Components } from 'react-markdown'
+import { useRetrievalFlow } from "@/hooks/useRetrievalFlow"
+import { useDataSelection } from "@/contexts/DataSelectionContext"
 
 import { getGroqApiKey, saveGroqApiKey } from "@/lib/env-config"
 
@@ -40,7 +43,27 @@ export function DocumentCreator({ onDocumentCreated }: DocumentCreatorProps) {
     title: string
     template: string
     preview: string
+    isHtml: boolean
   } | null>(null)
+  const { startRetrievalFlow, getRetrievalState } = useRetrievalFlow()
+  const { selectedDocuments: projectSelectedDocuments } = useDataSelection()
+
+  const markdownComponents: Components = {
+    h1: ({children}) => <h1 className="text-2xl font-bold mt-6 mb-4">{children}</h1>,
+    h2: ({children}) => <h2 className="text-xl font-bold mt-5 mb-3">{children}</h2>,
+    h3: ({children}) => <h3 className="text-lg font-semibold mt-4 mb-2">{children}</h3>,
+    h4: ({children}) => <h4 className="text-base font-semibold mt-3 mb-2">{children}</h4>,
+    p: ({children}) => <p className="my-3 leading-relaxed">{children}</p>,
+    ul: ({children}) => <ul className="list-disc pl-6 my-3">{children}</ul>,
+    ol: ({children}) => <ol className="list-decimal pl-6 my-3">{children}</ol>,
+    li: ({children}) => <li className="my-1">{children}</li>,
+    blockquote: ({children}) => <blockquote className="border-l-4 border-gray-200 pl-4 italic my-4">{children}</blockquote>,
+    a: ({href, children}) => <a href={href} className="text-blue-600 hover:underline">{children}</a>,
+    table: ({children}) => <table className="border-collapse table-auto w-full my-4">{children}</table>,
+    th: ({children}) => <th className="border border-gray-300 px-4 py-2 bg-gray-100 font-semibold">{children}</th>,
+    td: ({children}) => <td className="border border-gray-300 px-4 py-2">{children}</td>,
+    img: ({src, alt}) => <img src={src} alt={alt} className="max-w-full h-auto my-4 rounded" />
+  }
 
   const tools: Tool[] = [
     { id: "internet", label: "Internet Search", icon: Search },
@@ -61,6 +84,35 @@ export function DocumentCreator({ onDocumentCreated }: DocumentCreatorProps) {
   const removeDocument = (docId: string) => {
     setSelectedDocuments((prev) => prev.filter((doc) => doc.id !== docId))
   }
+
+  const handleSelectProjectDocuments = () => {
+    startRetrievalFlow()
+  }
+
+  useEffect(() => {
+    if (projectSelectedDocuments.length > 0) {
+      const newDocs = projectSelectedDocuments.map(doc => ({
+        id: doc.id,
+        title: doc.name,
+        template: doc.type === 'encrypted' ? 'Encrypted Document' : 'Unencrypted Document',
+        content: `<p>${doc.name} content</p>`,
+        createdAt: new Date().toISOString(),
+        pages: 1,
+        projectId: getRetrievalState().projectId || "project1",
+        type: doc.type,
+        size: "Unknown",
+      }))
+
+      // Add only new documents that aren't already in the list
+      const docsToAdd = newDocs.filter(
+        newDoc => !selectedDocuments.some(existingDoc => existingDoc.id === newDoc.id)
+      )
+
+      if (docsToAdd.length > 0) {
+        setSelectedDocuments(prev => [...prev, ...docsToAdd])
+      }
+    }
+  }, [projectSelectedDocuments])
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -92,7 +144,6 @@ export function DocumentCreator({ onDocumentCreated }: DocumentCreatorProps) {
       return
     }
 
-    // Save the API key for future use
     saveGroqApiKey(groqApiKey)
     
     setIsLoading(true)
@@ -104,8 +155,6 @@ export function DocumentCreator({ onDocumentCreated }: DocumentCreatorProps) {
       if (!template) {
         throw new Error("Selected template not found")
       }
-
-      // Format referenced documents for the prompt
       const referencedContent = selectedDocuments
         .map((doc) => {
           return `Document Title: ${doc.title}
@@ -113,10 +162,7 @@ Content: ${doc.content ? doc.content.substring(0, 500) + (doc.content.length > 5
         })
         .join("\n\n")
 
-      console.log("Generating document with Groq...")
-      
-      // Generate content using LangChain and Groq
-      const generatedContent = await generateDocumentContent({
+            const generatedContent = await generateDocumentContent({
         templateName: template.name,
         templatePurpose: template.description || "Generic document template",
         details: details || "Create a professional document following the template structure.",
@@ -124,9 +170,7 @@ Content: ${doc.content ? doc.content.substring(0, 500) + (doc.content.length > 5
         apiKey: groqApiKey,
       })
 
-      console.log("Document generation complete")
 
-      // Create the new document
       const newDocument: DocumentType = {
         id: `doc-${Date.now()}`,
         title: documentName,
@@ -141,8 +185,6 @@ Content: ${doc.content ? doc.content.substring(0, 500) + (doc.content.length > 5
         })),
       }
 
-      // Keep the loading screen visible for at least a minimum amount of time (22 seconds)
-      // This ensures the loading animation completes even if the API responds quickly
       const minLoadingTime = 22000
       const startTime = Date.now()
       const elapsedTime = Date.now() - startTime
@@ -165,27 +207,34 @@ Content: ${doc.content ? doc.content.substring(0, 500) + (doc.content.length > 5
     if (selectedTemplate) {
       const template = templates.find((t) => t.id === selectedTemplate)
 
-      // Create preview with referenced documents
       const referencedPreview =
         selectedDocuments.length > 0
-          ? `<h3>Referenced Documents</h3>
-           <ul>
-             ${selectedDocuments.map((doc) => `<li>${doc.title}</li>`).join("")}
-           </ul>`
+          ? `### Referenced Documents
+${selectedDocuments.map((doc) => `- ${doc.title}`).join("\n")}`
           : ""
+
+      const templatePreview = template?.preview || "No preview available"
+      
+      const isHtml = templatePreview.trim().startsWith("<")
 
       setPreviewDocument({
         title: documentName || "Untitled Document",
         template: template?.name || "Custom Template",
-        preview: `
-          ${template?.preview || "No preview available"}
-          ${referencedPreview}
-        `,
+        preview: isHtml 
+          ? `${templatePreview}
+            ${selectedDocuments.length > 0 
+              ? `<h3>Referenced Documents</h3>
+                 <ul>
+                   ${selectedDocuments.map((doc) => `<li>${doc.title}</li>`).join("")}
+                 </ul>` 
+              : ""}`
+          : `${templatePreview}
+${referencedPreview}`,
+        isHtml
       })
     }
   }
 
-  // Update preview when relevant fields change
   useEffect(() => {
     updatePreview()
   }, [documentName, selectedTemplate, selectedDocuments])
@@ -306,9 +355,10 @@ Content: ${doc.content ? doc.content.substring(0, 500) + (doc.content.length > 5
             <div className="space-y-2">
               <Label>Reference Documents</Label>
               <Tabs defaultValue="upload">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="upload">Upload Documents</TabsTrigger>
-                  <TabsTrigger value="project">Project Documents</TabsTrigger>
+                  <TabsTrigger value="project">Sample Documents</TabsTrigger>
+                  <TabsTrigger value="projectSearch">Project Search</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="upload" className="space-y-4 pt-4">
@@ -354,6 +404,27 @@ Content: ${doc.content ? doc.content.substring(0, 500) + (doc.content.length > 5
                     ))}
                   </div>
                 </TabsContent>
+
+                {/* New tab for project search integration */}
+                <TabsContent value="projectSearch" className="space-y-4 pt-4">
+                  <div className="text-center p-4 border border-dashed rounded-lg">
+                    <FolderOpen className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                    <p className="mb-3 text-sm text-muted-foreground">
+                      Select documents from your projects to reference while creating this document
+                    </p>
+                    <Button 
+                      onClick={handleSelectProjectDocuments}
+                      className="bg-[#4287f5] hover:bg-[#3a76d8]"
+                    >
+                      Browse Project Documents
+                    </Button>
+                    {getRetrievalState().projectName && (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Currently browsing: {getRetrievalState().projectName}
+                      </p>
+                    )}
+                  </div>
+                </TabsContent>
               </Tabs>
 
               {selectedDocuments.length > 0 && (
@@ -394,7 +465,14 @@ Content: ${doc.content ? doc.content.substring(0, 500) + (doc.content.length > 5
             <div className="p-4 min-h-[300px] max-h-[400px] overflow-y-auto">
               {previewDocument ? (
                 <div className="prose prose-sm max-w-none">
-                  <div dangerouslySetInnerHTML={{ __html: previewDocument.preview }} />
+                  {/* Render content based on type (HTML or Markdown) */}
+                  {previewDocument.isHtml ? (
+                    <div dangerouslySetInnerHTML={{ __html: previewDocument.preview }} />
+                  ) : (
+                    <ReactMarkdown components={markdownComponents}>
+                      {previewDocument.preview}
+                    </ReactMarkdown>
+                  )}
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">

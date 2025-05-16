@@ -11,6 +11,7 @@ import { DocumentChatbot } from "@/components/document/document-chatbot"
 import { Download, Save, Eye, Edit2, Settings, ChevronDown, ChevronUp } from "lucide-react"
 import type { DocumentType } from "@/lib/types"
 import ReactMarkdown from 'react-markdown'
+import type { Components } from 'react-markdown'
 
 interface DocumentEditorProps {
   document: DocumentType
@@ -22,16 +23,20 @@ export function DocumentEditor({ document: docData, onSave }: DocumentEditorProp
   const [documentTitle, setDocumentTitle] = useState(docData.title)
   const [documentContent, setDocumentContent] = useState(docData.content)
   const [isChatOpen, setIsChatOpen] = useState(false)
+  const [renderedContent, setRenderedContent] = useState("")
   const editorRef = useRef<HTMLTextAreaElement>(null)
 
-  // Ensure content is treated as markdown
+  // Process content for preview whenever it changes
   useEffect(() => {
-    // If the content is in HTML format (from older documents), convert it to markdown
-    if (docData.content && docData.content.startsWith("<")) {
-      // Basic conversion - in a real app, you'd want a proper HTML to Markdown converter
-      console.log("Legacy HTML document detected - treating as markdown")
+    // For Markdown content
+    if (!documentContent.trim().startsWith("<")) {
+      setRenderedContent(documentContent)
+      return
     }
-  }, [docData.content])
+    
+    // If it's HTML content from older documents, keep it as is
+    setRenderedContent(documentContent)
+  }, [documentContent])
 
   const handleSave = () => {
     const updatedDocument = {
@@ -70,6 +75,27 @@ export function DocumentEditor({ document: docData, onSave }: DocumentEditorProp
         }
       }, 0)
     }
+  }
+
+  // Determine if content is HTML or Markdown
+  const isHtmlContent = documentContent.trim().startsWith("<")
+
+  // Define markdown components with proper TypeScript typing
+  const markdownComponents: Components = {
+    h1: ({children}) => <h1 className="text-2xl font-bold mt-6 mb-4">{children}</h1>,
+    h2: ({children}) => <h2 className="text-xl font-bold mt-5 mb-3">{children}</h2>,
+    h3: ({children}) => <h3 className="text-lg font-semibold mt-4 mb-2">{children}</h3>,
+    h4: ({children}) => <h4 className="text-base font-semibold mt-3 mb-2">{children}</h4>,
+    p: ({children}) => <p className="my-3 leading-relaxed">{children}</p>,
+    ul: ({children}) => <ul className="list-disc pl-6 my-3">{children}</ul>,
+    ol: ({children}) => <ol className="list-decimal pl-6 my-3">{children}</ol>,
+    li: ({children}) => <li className="my-1">{children}</li>,
+    blockquote: ({children}) => <blockquote className="border-l-4 border-gray-200 pl-4 italic my-4">{children}</blockquote>,
+    a: ({href, children}) => <a href={href} className="text-blue-600 hover:underline">{children}</a>,
+    table: ({children}) => <table className="border-collapse table-auto w-full my-4">{children}</table>,
+    th: ({children}) => <th className="border border-gray-300 px-4 py-2 bg-gray-100 font-semibold">{children}</th>,
+    td: ({children}) => <td className="border border-gray-300 px-4 py-2">{children}</td>,
+    img: ({src, alt}) => <img src={src} alt={alt} className="max-w-full h-auto my-4 rounded" />
   }
 
   return (
@@ -113,7 +139,7 @@ export function DocumentEditor({ document: docData, onSave }: DocumentEditorProp
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="document-content">Content (Markdown)</Label>
+                <Label htmlFor="document-content">{isHtmlContent ? "Content (HTML)" : "Content (Markdown)"}</Label>
                 <Textarea
                   id="document-content"
                   ref={editorRef}
@@ -128,13 +154,19 @@ export function DocumentEditor({ document: docData, onSave }: DocumentEditorProp
           <TabsContent value="preview" className="pt-4">
             <Card>
               <CardContent className="p-6">
-                <div className="prose max-w-none">
+                <div className="prose prose-sm md:prose-base lg:prose-lg max-w-none">
                   <h1>{documentTitle}</h1>
                   
-                  {/* Render markdown content instead of HTML */}
-                  <div className="markdown-preview">
-                    <ReactMarkdown>{documentContent}</ReactMarkdown>
-                  </div>
+                  {/* Render content based on type (HTML or Markdown) */}
+                  {isHtmlContent ? (
+                    <div dangerouslySetInnerHTML={{ __html: renderedContent }} />
+                  ) : (
+                    <div className="markdown-content">
+                      <ReactMarkdown components={markdownComponents}>
+                        {renderedContent}
+                      </ReactMarkdown>
+                    </div>
+                  )}
 
                   {docData.referencedDocuments && docData.referencedDocuments.length > 0 && (
                     <div className="mt-8 p-4 border rounded-md bg-blue-50">
@@ -163,7 +195,7 @@ export function DocumentEditor({ document: docData, onSave }: DocumentEditorProp
 
                 <div className="space-y-2">
                   <Label htmlFor="document-format">Format</Label>
-                  <Input id="document-format" defaultValue="Markdown" disabled />
+                  <Input id="document-format" defaultValue={isHtmlContent ? "HTML" : "Markdown"} disabled />
                 </div>
 
                 <div className="space-y-2">
