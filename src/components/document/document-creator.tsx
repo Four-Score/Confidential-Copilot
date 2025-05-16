@@ -1,4 +1,3 @@
-// src\components\document\document-creator.tsx
 "use client"
 
 import type React from "react"
@@ -18,6 +17,8 @@ import type { DocumentType, Tool } from "@/lib/types"
 import { generateDocumentContent } from "@/lib/document-generator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { DocumentLoadingScreen } from "@/components/document/document-loading-screen"
+import ReactMarkdown from 'react-markdown'
+import type { Components } from 'react-markdown'
 
 import { getGroqApiKey, saveGroqApiKey } from "@/lib/env-config"
 
@@ -40,7 +41,26 @@ export function DocumentCreator({ onDocumentCreated }: DocumentCreatorProps) {
     title: string
     template: string
     preview: string
+    isHtml: boolean
   } | null>(null)
+
+  // Define markdown components with proper TypeScript typing
+  const markdownComponents: Components = {
+    h1: ({children}) => <h1 className="text-2xl font-bold mt-6 mb-4">{children}</h1>,
+    h2: ({children}) => <h2 className="text-xl font-bold mt-5 mb-3">{children}</h2>,
+    h3: ({children}) => <h3 className="text-lg font-semibold mt-4 mb-2">{children}</h3>,
+    h4: ({children}) => <h4 className="text-base font-semibold mt-3 mb-2">{children}</h4>,
+    p: ({children}) => <p className="my-3 leading-relaxed">{children}</p>,
+    ul: ({children}) => <ul className="list-disc pl-6 my-3">{children}</ul>,
+    ol: ({children}) => <ol className="list-decimal pl-6 my-3">{children}</ol>,
+    li: ({children}) => <li className="my-1">{children}</li>,
+    blockquote: ({children}) => <blockquote className="border-l-4 border-gray-200 pl-4 italic my-4">{children}</blockquote>,
+    a: ({href, children}) => <a href={href} className="text-blue-600 hover:underline">{children}</a>,
+    table: ({children}) => <table className="border-collapse table-auto w-full my-4">{children}</table>,
+    th: ({children}) => <th className="border border-gray-300 px-4 py-2 bg-gray-100 font-semibold">{children}</th>,
+    td: ({children}) => <td className="border border-gray-300 px-4 py-2">{children}</td>,
+    img: ({src, alt}) => <img src={src} alt={alt} className="max-w-full h-auto my-4 rounded" />
+  }
 
   const tools: Tool[] = [
     { id: "internet", label: "Internet Search", icon: Search },
@@ -92,7 +112,6 @@ export function DocumentCreator({ onDocumentCreated }: DocumentCreatorProps) {
       return
     }
 
-    // Save the API key for future use
     saveGroqApiKey(groqApiKey)
     
     setIsLoading(true)
@@ -141,8 +160,6 @@ Content: ${doc.content ? doc.content.substring(0, 500) + (doc.content.length > 5
         })),
       }
 
-      // Keep the loading screen visible for at least a minimum amount of time (22 seconds)
-      // This ensures the loading animation completes even if the API responds quickly
       const minLoadingTime = 22000
       const startTime = Date.now()
       const elapsedTime = Date.now() - startTime
@@ -168,19 +185,29 @@ Content: ${doc.content ? doc.content.substring(0, 500) + (doc.content.length > 5
       // Create preview with referenced documents
       const referencedPreview =
         selectedDocuments.length > 0
-          ? `<h3>Referenced Documents</h3>
-           <ul>
-             ${selectedDocuments.map((doc) => `<li>${doc.title}</li>`).join("")}
-           </ul>`
+          ? `### Referenced Documents
+${selectedDocuments.map((doc) => `- ${doc.title}`).join("\n")}`
           : ""
+
+      const templatePreview = template?.preview || "No preview available"
+      
+      // Determine if the content is HTML
+      const isHtml = templatePreview.trim().startsWith("<")
 
       setPreviewDocument({
         title: documentName || "Untitled Document",
         template: template?.name || "Custom Template",
-        preview: `
-          ${template?.preview || "No preview available"}
-          ${referencedPreview}
-        `,
+        preview: isHtml 
+          ? `${templatePreview}
+            ${selectedDocuments.length > 0 
+              ? `<h3>Referenced Documents</h3>
+                 <ul>
+                   ${selectedDocuments.map((doc) => `<li>${doc.title}</li>`).join("")}
+                 </ul>` 
+              : ""}`
+          : `${templatePreview}
+${referencedPreview}`,
+        isHtml
       })
     }
   }
@@ -394,7 +421,14 @@ Content: ${doc.content ? doc.content.substring(0, 500) + (doc.content.length > 5
             <div className="p-4 min-h-[300px] max-h-[400px] overflow-y-auto">
               {previewDocument ? (
                 <div className="prose prose-sm max-w-none">
-                  <div dangerouslySetInnerHTML={{ __html: previewDocument.preview }} />
+                  {/* Render content based on type (HTML or Markdown) */}
+                  {previewDocument.isHtml ? (
+                    <div dangerouslySetInnerHTML={{ __html: previewDocument.preview }} />
+                  ) : (
+                    <ReactMarkdown components={markdownComponents}>
+                      {previewDocument.preview}
+                    </ReactMarkdown>
+                  )}
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
