@@ -1,54 +1,98 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Confidential Copilot
+
+Confidential Copilot is a privacy-preserving AI assistant platform. It leverages secure technologies to provide intelligent assistance while protecting user data and communications. The project appears to include a core application along with an email assistant extension.
+
+## Features
+
+- **Privacy-first:** Built with privacy and security as core principles.
+- **AI-powered assistance:** Integrates with modern AI frameworks for natural language understanding and task automation.
+- **Extensible:** Modular design allows for additional extensions, such as the email assistant.
+- **Modern stack:** Uses Next.js, React, and a suite of powerful libraries for rapid development.
+
+## Project Structure
+
+- `/extensions/email-assistant-extension` — A secure email assistant with privacy-preserving features.
+- Main application in the project root (`cc_copilot`), built with Next.js and React.
 
 ## Getting Started
 
-For development:
-Clone the repo and navigate to the project folder
+### Prerequisites
 
-Ensure you have the following node and npm versions by running the following commands
+- Node.js (v18 or newer recommended)
+- npm or yarn
 
-`node -v`
+### Install Dependencies
 
-output: v22.14.0
+```bash
+npm install
+# or
+yarn install
+```
 
-`npm -v`
+### Development
 
-
-output: v10.9.2
-
-If not then:
-
-`npm install`
-
-And finally, run the development server:
+To start the main app in development mode:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+For the email assistant extension:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cd extensions/email-assistant-extension
+npm install
+npm run start
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Build
 
-## Learn More
+To build the main app:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+To build the email assistant extension:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+cd extensions/email-assistant-extension
+npm run build
+```
 
-## Deploy on Vercel
+## Scripts
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `dev` — Start Next.js app in development mode
+- `build` — Build for production
+- `start` — Run the production build
+- `lint` — Lint codebase
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Dependencies
+
+- Next.js
+- React
+- Supabase
+- LangChain
+- Radix UI
+- and others (see `package.json`)
+
+### Extension Dependencies
+
+- React
+- Webpack
+
+## Contributing
+
+Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+
+## License
+
+This project may not yet have a license specified. Please add one to clarify usage.
+
+## Maintainers
+
+- Organization: [Four-Score](https://github.com/Four-Score)
+
+---
+
+*Generated with Copilot. Please edit for accuracy and to add project-specific details!*
