@@ -1,6 +1,6 @@
 # Confidential Copilot
 
-Confidential Copilot is a privacy-preserving AI assistant platform. It leverages secure technologies to provide intelligent assistance while protecting user data and communications. The project appears to include a core application along with an email assistant extension.
+Confidential Copilot is a privacy-preserving AI assistant platform. It leverages secure technologies to provide intelligent assistance while protecting user data and communications.
 
 ## Features
 
